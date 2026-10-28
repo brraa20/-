@@ -1,0 +1,208 @@
+.assessment-shell {
+    width: min(860px, calc(100% - 32px));
+    margin: 32px auto 64px;
+}
+
+.stage-heading,
+.progress-meta,
+.assessment-actions,
+.result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.eyebrow {
+    color: var(--green);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.stage-heading h1 { color: var(--ink); }
+
+.student-chip {
+    width: min(300px, 45%);
+    min-width: 0;
+    padding: 12px 16px;
+    border: 1px solid rgba(47, 143, 70, 0.25);
+    border-radius: 8px;
+    background: var(--paper);
+    text-align: center;
+}
+
+.progress-panel {
+    margin: 24px 0;
+    padding: 16px 18px;
+    border-radius: 8px;
+    background: var(--paper);
+}
+
+.progress-meta { margin-bottom: 10px; color: var(--muted); }
+
+.progress-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: #e7e3d8;
+}
+
+.progress-track div {
+    height: 100%;
+    width: 5%;
+    background: var(--green);
+    transition: width 240ms ease;
+}
+
+.question-card,
+.intervention-card,
+.results-card {
+    min-height: 340px;
+    padding: 28px;
+    border: 1px solid rgba(47, 143, 70, 0.22);
+    border-radius: 8px;
+    background: var(--paper);
+    box-shadow: 0 16px 40px rgba(41, 58, 36, 0.08);
+}
+
+.skill-tag {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 6px 10px;
+    border-radius: 5px;
+    background: #edf4eb;
+    color: #2f703a;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.passage {
+    margin: 18px 0;
+    padding: 16px;
+    border-inline-start: 4px solid #d08a32;
+    background: #f7f2e4;
+    line-height: 2;
+}
+
+.question-text,
+.lesson-block h2 { color: var(--ink); }
+
+.answer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.answer-option {
+    min-height: 62px;
+    border: 1px solid #cbcdbf;
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.answer-option:hover { border-color: var(--green); }
+.answer-option.selected { border: 2px solid var(--green); background: #edf7ec; }
+.answer-option.correct { border: 2px solid #2f8f46; background: #edf7ec; }
+.answer-option.incorrect { border: 2px solid #b64b45; background: #fff0ed; }
+
+.assessment-actions { margin-top: 18px; }
+.assessment-actions button,
+.action-button {
+    min-height: 48px;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.primary-button { border: 0; background: var(--green); color: #fff; }
+.secondary-button { border: 1px solid #c8cbbd; background: #fffaf0; color: var(--ink); }
+.assessment-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lesson-grid,
+.error-review,
+.results-grid {
+    display: grid;
+    gap: 16px;
+}
+.lesson-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.lesson-block,
+.error-item,
+.skill-result {
+    padding: 18px;
+    border: 1px solid #ddd9ca;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.lesson-block h2 { margin-bottom: 8px; font-size: 1.1rem; }
+.lesson-block p { line-height: 1.9; }
+ .learning-path { margin: 12px 0 20px; padding: 12px 14px; border-inline-start: 4px solid #c49643; background: #f8f5eb; font-weight: 700; }
+ .intervention-plan { border-top: 4px solid #176b45; }
+ .mastery-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 16px; }
+ .mastery-row strong { color: #176b45; font-size: 1.45rem; }
+ .mastery-row span { color: #66736b; }
+.practice-example { padding: 12px; border: 1px solid #dce2db; border-radius: 6px; background: #f7faf7; }
+.practice-example p {
+    margin-top: 8px;
+    color: #555f51;
+    line-height: 1.8;
+}
+.correct-answer { color: #237c37; font-weight: 600; }
+
+.results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.skill-result-row { display: grid; grid-template-columns: 1fr 84px; align-items: center; gap: 12px; }
+.skill-name { font-weight: 600; }
+
+.bar-track {
+    height: 10px;
+    margin-top: 8px;
+    border-radius: 5px;
+    background: #e8e6dc;
+}
+
+.bar-track div { height: 100%; border-radius: 5px; }
+
+.chart-panel {
+    grid-column: 1 / -1;
+    padding: 18px;
+    border: 1px solid #ddd9ca;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.chart-bars {
+    height: 260px;
+    display: flex;
+    align-items: end;
+    justify-content: space-around;
+    gap: 12px;
+    direction: ltr;
+}
+
+.chart-column { height: 100%; flex: 1; display: flex; flex-direction: column; justify-content: end; align-items: center; }
+.chart-column .bar { width: min(58px, 70%); min-height: 4px; border-radius: 5px 5px 0 0; }
+.chart-column span { margin-top: 8px; color: var(--ink); font-size: 0.72rem; text-align: center; direction: rtl; }
+
+.action-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+.action-button { border: 1px solid #bdc2b2; background: #fff; }
+
+@media print {
+    body { background: #fff; }
+    .site-header, body::before, .assessment-actions, .action-row, .secondary-button { display: none !important; }
+    .assessment-shell { width: 100%; margin: 0; }
+}
+
+@media (max-width: 700px) {
+    .assessment-shell { width: calc(100% - 20px); margin-top: 18px; }
+    .stage-heading, .result-header { align-items: flex-start; }
+    .student-chip { min-width: 0; }
+    .answer-grid, .lesson-grid, .results-grid { grid-template-columns: 1fr; }
+    .question-card, .intervention-card, .results-card { padding: 20px 16px; }
+    .assessment-actions { flex-direction: column-reverse; }
+    .assessment-actions button { width: 100%; }
+}

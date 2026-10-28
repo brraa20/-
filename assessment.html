@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#176b45">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
+    <title>منصة طلاقة | الاختبار التشخيصي</title>
+    <link rel="stylesheet" href="ملفات الموقع/styles.css">
+    <link rel="stylesheet" href="ملفات الموقع/assessment.css">
+    <link rel="stylesheet" href="ملفات الموقع/theme.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="index.html">
+            <img src="logo/talala-logo.svg" alt="">
+            <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">رحلتك في القراءة</span></span>
+        </a>
+        <nav aria-label="التنقل الرئيسي">
+            <ul><li><a href="index.html">الرئيسية</a></li><li><a href="support.html">الدعم</a></li></ul>
+        </nav>
+    </header>
+    <main class="assessment-shell">
+        <div class="stage-heading">
+            <div>
+                <p class="eyebrow">منصة طلاقة</p>
+                <h1 id="stage-title" aria-live="polite">الاختبار التشخيصي</h1>
+            </div>
+            <div class="student-chip" id="student-chip"></div>
+        </div>
+
+        <section class="progress-panel" aria-label="تقدم الاختبار">
+            <div class="progress-meta">
+                <span id="stage-label">تشخيص المهارات</span>
+                <span id="progress-label" aria-live="polite">السؤال 1 من 20</span>
+            </div>
+            <div class="progress-track" role="progressbar" aria-label="التقدم في الاختبار" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-bar"></div></div>
+        </section>
+
+        <section id="assessment-content" aria-live="polite"></section>
+
+        <div class="assessment-actions">
+            <button type="button" class="secondary-button" id="previous-question">السؤال السابق</button>
+            <button type="button" class="primary-button" id="next-question">السؤال التالي</button>
+        </div>
+    </main>
+
+    <script src="ملفات الموقع/assessment-data.js"></script>
+    <script src="ملفات الموقع/assessment.js"></script>
+</body>
+</html>

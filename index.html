@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#176b45">
+        <meta name="description" content="منصة طلاقة لتشخيص مهارات القراءة وتقديم التدخلات التعليمية المخصصة.">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+        <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
+        <link rel="stylesheet" href="ملفات الموقع/styles.css" />
+        <link rel="stylesheet" href="ملفات الموقع/theme.css" />
+        <title>منصة طلاقة</title>
+    </head>
+    <body>
+
+        <header class="site-header">
+            <div class="brand">
+                <img src="logo/talala-logo.svg" alt="شعار منصة طلاقة: كتاب مفتوح ونباتة نمو" />
+                <div class="brand-name">
+                    <h1>منصة طلاقة</h1>
+                    <span class="brand-badge">منصة تجريبية</span>
+                </div>
+            </div>
+            <nav class="navigation">
+                <ul>
+                    <li><a class="teacher-login-button" href="teacher-login.html">دخول المعلم/ة</a></li>
+                    <li><a class="support-button" href="support.html">التواصل والدعم</a></li>
+                </ul>
+            </nav>
+        </header>
+        <hr />
+        <main class="hero">
+            <div class="hero-content">
+                <section class="hero-overview" aria-labelledby="journey-title">
+                    <div>
+                        <h2 class="journey-title" id="journey-title">ابدأ رحلتك في إتقان مهارات القراءة</h2>
+                        <p class="intro">
+                            اختبار قصير يوضح مهارات القراءة ويقترح خطوات مناسبة للتعلّم.
+                        </p>
+                        <ul class="platform-benefits" aria-label="مزايا منصة طلاقة">
+                            <li><strong>تشخيص واضح</strong><span>اعرف ما تتقنه وما يحتاج دعمًا.</span></li>
+                            <li><strong>تدريب مناسب</strong><span>تعلّم وفق احتياجك.</span></li>
+                            <li><strong>تابع تقدمك</strong><span>راجع نتيجتك بعد الاختبار.</span></li>
+                        </ul>
+                    </div>
+                    <img
+                        class="hero-illustration"
+                        src="logo/reading-illustration.svg"
+                        alt="طالب/ة في أثناء قراءة كتاب مفتوح وسط أوراق ونباتات"
+                        width="720"
+                        height="360"
+                    />
+                </section>
+
+                <section class="diagnosis-card" aria-labelledby="diagnosis-title">
+                    <h2 id="diagnosis-title">جلسة التشخيص</h2>
+                    <hr />
+                    <p>
+                        أدخل الاسم واختر الصف لبدء الاختبار.
+                    </p>
+
+                    <hr class="form-divider" />
+
+                    <form class="diagnosis-form" id="diagnosis-form">
+                        <label for="student-name">اسم الطالب/ة <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input
+                            id="student-name"
+                            name="studentName"
+                            type="text"
+                            placeholder="الاسم"
+                            autocomplete="name"
+                            required
+                        />
+
+                        <fieldset>
+                            <legend>الصف الدراسي <span class="required-mark" aria-hidden="true">*</span></legend>
+                            <div class="grade-grid">
+                                <input class="grade-option" type="radio" name="grade" id="grade-1" value="الأول الابتدائي" required />
+                                <label for="grade-1">الأول الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-2" value="الثاني الابتدائي" />
+                                <label for="grade-2">الثاني الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-3" value="الثالث الابتدائي" />
+                                <label for="grade-3">الثالث الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-4" value="الرابع الابتدائي" />
+                                <label for="grade-4">الرابع الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-5" value="الخامس الابتدائي" />
+                                <label for="grade-5">الخامس الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-6" value="السادس الابتدائي" />
+                                <label for="grade-6">السادس الابتدائي</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-7" value="الأول المتوسط" />
+                                <label for="grade-7">الأول المتوسط</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-8" value="الثاني المتوسط" />
+                                <label for="grade-8">الثاني المتوسط</label>
+
+                                <input class="grade-option" type="radio" name="grade" id="grade-9" value="الثالث المتوسط" />
+                                <label for="grade-9">الثالث المتوسط</label>
+                            </div>
+                        </fieldset>
+
+                        <button type="submit" id="start-diagnosis" disabled>ابدأ الاختبار</button>
+                    </form>
+                </section>
+            </div>
+        </main>
+
+        <script>
+            const diagnosisForm = document.querySelector('#diagnosis-form');
+            const studentName = document.querySelector('#student-name');
+            const startButton = document.querySelector('#start-diagnosis');
+
+            function updateStartButton() {
+                const selectedGrade = diagnosisForm.querySelector('input[name="grade"]:checked');
+                startButton.disabled = studentName.value.trim() === '' || !selectedGrade;
+            }
+
+            diagnosisForm.addEventListener('input', updateStartButton);
+            diagnosisForm.addEventListener('change', updateStartButton);
+            diagnosisForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                const selectedGrade = diagnosisForm.querySelector('input[name="grade"]:checked');
+                if (studentName.value.trim() === '' || !selectedGrade) return;
+
+                sessionStorage.setItem('talalaStudentName', studentName.value.trim());
+                sessionStorage.setItem('talalaStudentGrade', selectedGrade.value);
+                sessionStorage.removeItem('talalaAssessmentStarted');
+                window.location.href = 'assessment-instructions.html';
+            });
+        </script>
+
+    </body>
+</html>

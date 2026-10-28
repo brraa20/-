@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#176b45">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
+    <title>تعليمات الاختبار التشخيصي | منصة طلاقة</title>
+    <link rel="stylesheet" href="ملفات الموقع/styles.css">
+    <link rel="stylesheet" href="ملفات الموقع/assessment.css">
+    <link rel="stylesheet" href="ملفات الموقع/theme.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="index.html">
+            <img src="logo/talala-logo.svg" alt="">
+            <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">رحلتك في القراءة</span></span>
+        </a>
+        <nav aria-label="التنقل الرئيسي">
+            <ul><li><a href="index.html">الرئيسية</a></li><li><a href="support.html">الدعم</a></li></ul>
+        </nav>
+    </header>
+    <main class="instructions-shell">
+        <section class="instructions-card">
+            <p class="eyebrow">منصة طلاقة</p>
+            <h1>تعليمات الاختبار التشخيصي</h1>
+            <p id="student-details" class="instructions-note" aria-live="polite"></p>
+            <ol class="instruction-list">
+                <li><span class="instruction-number">1</span><span>أجب عن <strong>20 سؤالًا</strong> في مهارات القراءة.</span></li>
+                <li><span class="instruction-number">2</span><span>اختر إجابة واحدة لكل سؤال.</span></li>
+                <li><span class="instruction-number">3</span><span>استخدم السابق والتالي لمراجعة إجاباتك.</span></li>
+                <li><span class="instruction-number">4</span><span>أكمل إجابتك ثم سلّم التشخيص.</span></li>
+            </ol>
+            <div class="instruction-actions">
+                <button type="button" class="secondary-button" id="back-home">الرئيسية</button>
+                <button type="button" class="primary-button" id="begin-assessment">ابدأ الاختبار</button>
+            </div>
+        </section>
+    </main>
+    <script>
+        const name = sessionStorage.getItem('talalaStudentName');
+        const grade = sessionStorage.getItem('talalaStudentGrade');
+        if (!name || !grade) window.location.replace('index.html');
+        document.querySelector('#student-details').textContent = `${name} • ${grade}`;
+        document.querySelector('#back-home').addEventListener('click', () => window.location.href = 'index.html');
+        document.querySelector('#begin-assessment').addEventListener('click', () => {
+            sessionStorage.setItem('talalaAssessmentStarted', 'true');
+            window.location.href = 'assessment.html';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" role="img" aria-labelledby="title description">
+  <title id="title">تعزيز مهارات القراءة</title>
+  <desc id="description">شخص يقرأ كتابًا بسلام وسط أوراق وألوان هادئة.</desc>
+  <rect width="720" height="360" rx="28" fill="#f7f5ed"/>
+  <circle cx="616" cy="54" r="36" fill="#e3c98f" opacity=".55"/>
+  <path d="M0 302c126-70 230-35 340-16 142 25 260-18 380-74v148H0Z" fill="#e4eee7"/>
+  <path d="M92 310c45-66 94-101 147-104 46-3 77 20 103 64" fill="none" stroke="#176b45" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="355" cy="118" r="54" fill="#dcae7f"/>
+  <path d="M306 118c9-62 100-74 109-7-18-19-73-19-109 7Z" fill="#263f31"/>
+  <path d="M302 182c32-25 70-25 107 0l26 94H275Z" fill="#426f56"/>
+  <path d="M356 177v86" fill="none" stroke="#f7f5ed" stroke-width="4"/>
+  <path d="M274 237c42-7 68 6 82 27-45 8-75-1-82-27Zm164 0c-42-7-68 6-82 27 45 8 75-1 82-27Z" fill="#fffdf8" stroke="#c49643" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M355 264c-8-34-3-59 16-75" fill="none" stroke="#c49643" stroke-width="4" stroke-linecap="round"/>
+  <path d="M533 235h86M550 206h69M566 177h53" fill="none" stroke="#88a694" stroke-width="8" stroke-linecap="round"/>
+  <path d="M520 128c26-5 48-1 65 12M541 98c19-5 34-2 46 7" fill="none" stroke="#c49643" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="501" cy="78" r="7" fill="#176b45"/><circle cx="482" cy="57" r="5" fill="#176b45"/><circle cx="462" cy="75" r="4" fill="#c49643"/>
+</svg>
