@@ -1,10 +1,6 @@
 const studentName = sessionStorage.getItem('talalaStudentName');
 const studentGrade = sessionStorage.getItem('talalaStudentGrade');
 const data = window.TalalaAssessmentData;
-const customQuestions = JSON.parse(localStorage.getItem('talalaReadingQuestionBank') || 'null');
-if (customQuestions && ['diagnostic', 'intervention', 'final'].every((stage) => Array.isArray(customQuestions[stage]))) {
-    data.questions = customQuestions;
-}
 
 if (!studentName || !studentGrade || sessionStorage.getItem('talalaAssessmentStarted') !== 'true') {
     window.location.replace(studentName && studentGrade ? 'assessment-instructions.html' : 'index.html');
@@ -159,6 +155,30 @@ const skillInterventions = {
     }
 };
 
+async function initializeAssessment() {
+    try {
+        const questions = await window.TalalaBackend.loadContent('questions');
+        if (questions && ['diagnostic', 'intervention', 'final'].every((stage) => Array.isArray(questions[stage]))) {
+            data.questions = questions;
+        }
+        const interventions = await window.TalalaBackend.loadContent('interventions');
+        if (Array.isArray(interventions)) {
+            interventions.forEach((intervention) => {
+                if (skillInterventions[intervention.skill] && intervention.content) {
+                    skillInterventions[intervention.skill].action = intervention.content;
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Unable to load the shared question bank.', error);
+        content.innerHTML = `<p class="error" role="alert">تعذر تحميل بنك الأسئلة المشترك: ${escapeHtml(error.message)}</p>`;
+        previousButton.hidden = true;
+        nextButton.hidden = true;
+        return;
+    }
+    renderQuestion();
+}
+
 function renderIntervention() {
     state.stage = 'intervention';
     state.index = 0;
@@ -243,7 +263,8 @@ function startFinalTest() {
     state.finalAnswers = [];
     title.textContent = titles.final;
     buildFinalQuestions();
-    renderQuestion();
+    content.textContent = 'جار تحميل الاختبار...';
+    void initializeAssessment();
 }
 
 function renderResults() {
@@ -261,7 +282,14 @@ function renderResults() {
         const impact = difference >= 15 ? 'تحسن ملحوظ' : difference >= 5 ? 'تحسن تدريجي' : difference >= -4 ? 'استقرار الإتقان' : 'يحتاج دعمًا إضافيًا';
         return { ...result, difference, impact };
     });
-    saveStudentReport(diagnosticResults, finalResults);
+    saveStudentReport(diagnosticResults, finalResults)
+        .then(() => {
+            document.querySelector('#report-save-status').textContent = 'حُفظت النتيجة في قاعدة بيانات المنصة.';
+        })
+        .catch((error) => {
+            console.error('Unable to save the student assessment result.', error);
+            document.querySelector('#report-save-status').textContent = `تعذر حفظ النتيجة؛ لم تصل إلى المعلمين: ${error.message}`;
+        });
 
     content.innerHTML = `
         <section class="results-card">
@@ -293,7 +321,7 @@ function renderResults() {
                     </div>
                 </div>
             </div>
-            <p class="local-storage-note">حُفظ هذا الملخص في المتصفح الحالي ليظهر في لوحة المعلم/ة على هذا الجهاز.</p>
+            <p class="local-storage-note" id="report-save-status" role="status">جار حفظ النتيجة في قاعدة بيانات المنصة...</p>
             <div class="action-row">
                 <button type="button" class="action-button" id="print-results">طباعة التقرير أو حفظه PDF</button>
             </div>
@@ -303,9 +331,7 @@ function renderResults() {
     document.querySelector('#print-results').addEventListener('click', () => window.print());
 }
 
-function saveStudentReport(diagnosticResults, finalResults) {
-    const reportsKey = 'talalaStudentReports';
-    const reports = JSON.parse(localStorage.getItem(reportsKey) || '[]');
+async function saveStudentReport(diagnosticResults, finalResults) {
     const diagnosticTotal = diagnosticResults.reduce((total, result) => total + result.total, 0);
     const diagnosticCorrect = diagnosticResults.reduce((total, result) => total + result.correct, 0);
     const finalTotal = finalResults.reduce((total, result) => total + result.total, 0);
@@ -315,21 +341,17 @@ function saveStudentReport(diagnosticResults, finalResults) {
     const weakSkills = diagnosticResults
         .filter((result) => result.percent < 80)
         .map((result) => result.name);
-    const existingIndex = reports.findIndex((report) => report.name === studentName && report.grade === studentGrade);
-    const attempts = existingIndex >= 0 ? (Number(reports[existingIndex].attempts) || 0) + 1 : 1;
     const report = {
-        name: studentName,
+        student_name: studentName,
         grade: studentGrade,
-        attempts,
         percent,
-        diagnosticPercent,
+        diagnostic_percent: diagnosticPercent,
         progress: percent >= 80 ? 'متقدم' : percent >= 60 ? 'قيد التحسن' : 'يحتاج إلى دعم',
-        date: new Date().toISOString().slice(0, 10),
-        weakSkills
+        weak_skills: weakSkills,
+        diagnostic_results: diagnosticResults,
+        final_results: finalResults
     };
-    if (existingIndex >= 0) reports.splice(existingIndex, 1);
-    reports.unshift(report);
-    localStorage.setItem(reportsKey, JSON.stringify(reports));
+    await window.TalalaBackend.saveAttempt(report);
 }
 
 nextButton.addEventListener('click', () => {
@@ -359,4 +381,5 @@ previousButton.addEventListener('click', () => {
     }
 });
 
-renderQuestion();
+content.textContent = 'جار تحميل الاختبار...';
+void initializeAssessment();

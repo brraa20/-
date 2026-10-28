@@ -1,0 +1,281 @@
+create extension if not exists pgcrypto with schema extensions;
+
+create table if not exists public.profiles (
+    id uuid primary key references auth.users (id) on delete cascade,
+    email text not null default '',
+    display_name text not null default '',
+    role text not null default 'teacher' check (role in ('owner', 'teacher')),
+    active boolean not null default false,
+    permissions text[] not null default '{}',
+    created_at timestamptz not null default now()
+);
+alter table public.profiles add column if not exists email text not null default '';
+
+create or replace function public.create_teacher_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    insert into public.profiles (id, email, display_name)
+    values (new.id, new.email, coalesce(new.raw_user_meta_data ->> 'display_name', ''))
+    on conflict (id) do nothing;
+    return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute function public.create_teacher_profile();
+revoke all on function public.create_teacher_profile() from public;
+
+create or replace function public.is_active_teacher()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select exists (
+        select 1
+        from public.profiles
+        where id = (select auth.uid())
+          and active
+    );
+$$;
+
+create or replace function public.is_platform_owner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select exists (
+        select 1
+        from public.profiles
+        where id = (select auth.uid())
+          and active
+          and role = 'owner'
+    );
+$$;
+
+create or replace function public.has_teacher_permission(required_permission text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select public.is_platform_owner() or exists (
+        select 1
+        from public.profiles
+        where id = (select auth.uid())
+          and active
+          and required_permission = any(permissions)
+    );
+$$;
+
+create table if not exists public.app_content (
+    content_key text primary key check (content_key in ('questions', 'interventions', 'settings')),
+    content jsonb not null,
+    updated_at timestamptz not null default now(),
+    updated_by uuid references auth.users (id) on delete set null
+);
+
+create table if not exists public.assessment_attempts (
+    id uuid primary key default gen_random_uuid(),
+    student_name text not null check (char_length(btrim(student_name)) between 1 and 120),
+    grade text not null check (grade in (
+        'الأول الابتدائي', 'الثاني الابتدائي', 'الثالث الابتدائي',
+        'الرابع الابتدائي', 'الخامس الابتدائي', 'السادس الابتدائي',
+        'الأول المتوسط', 'الثاني المتوسط', 'الثالث المتوسط'
+    )),
+    diagnostic_results jsonb not null,
+    final_results jsonb not null,
+    percent smallint not null check (percent between 0 and 100),
+    diagnostic_percent smallint not null check (diagnostic_percent between 0 and 100),
+    progress text not null check (progress in ('متقدم', 'قيد التحسن', 'يحتاج إلى دعم')),
+    weak_skills text[] not null default '{}',
+    created_at timestamptz not null default now(),
+    check (jsonb_typeof(diagnostic_results) = 'array'),
+    check (jsonb_typeof(final_results) = 'array')
+);
+
+create index if not exists assessment_attempts_created_at_idx
+    on public.assessment_attempts (created_at desc);
+create index if not exists assessment_attempts_name_grade_idx
+    on public.assessment_attempts (student_name, grade, created_at desc);
+
+create table if not exists public.support_tickets (
+    ticket_code uuid primary key default gen_random_uuid(),
+    request_type text not null check (request_type in ('مشكلة', 'مقترح', 'استفسار')),
+    full_name text not null check (char_length(btrim(full_name)) between 1 and 120),
+    subject text not null check (char_length(btrim(subject)) between 1 and 200),
+    details text not null check (char_length(btrim(details)) between 1 and 5000),
+    status text not null default 'بانتظار الرد'
+        check (status in ('بانتظار الرد', 'قيد المعالجة', 'تم الرد')),
+    reply text not null default '',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz
+);
+
+alter table public.profiles enable row level security;
+alter table public.app_content enable row level security;
+alter table public.assessment_attempts enable row level security;
+alter table public.support_tickets enable row level security;
+
+revoke all on public.profiles, public.app_content, public.assessment_attempts, public.support_tickets from anon, authenticated;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.app_content to authenticated;
+grant select on public.app_content to anon;
+grant insert on public.assessment_attempts to anon;
+grant select, delete on public.assessment_attempts to authenticated;
+grant select, update, delete on public.support_tickets to authenticated;
+revoke all on function public.is_active_teacher() from public;
+revoke all on function public.is_platform_owner() from public;
+revoke all on function public.has_teacher_permission(text) from public;
+grant execute on function public.is_active_teacher() to anon, authenticated;
+grant execute on function public.is_platform_owner() to anon, authenticated;
+grant execute on function public.has_teacher_permission(text) to anon, authenticated;
+
+drop policy if exists "Users read their own profile and owners read all" on public.profiles;
+create policy "Users read their own profile and owners read all"
+    on public.profiles for select to authenticated
+    using (id = (select auth.uid()) or public.is_platform_owner());
+
+drop policy if exists "Owners update teacher profiles" on public.profiles;
+create policy "Owners update teacher profiles"
+    on public.profiles for update to authenticated
+    using (public.is_platform_owner())
+    with check (public.is_platform_owner());
+
+drop policy if exists "Public read published questions and interventions" on public.app_content;
+create policy "Public read published questions and interventions"
+    on public.app_content for select to anon, authenticated
+    using (content_key in ('questions', 'interventions'));
+
+drop policy if exists "Authorized teachers read app content" on public.app_content;
+create policy "Authorized teachers read app content"
+    on public.app_content for select to authenticated
+    using (
+        (content_key = 'questions' and public.is_active_teacher())
+        or (content_key = 'interventions' and public.has_teacher_permission('interventions'))
+        or (content_key = 'settings' and public.is_platform_owner())
+    );
+
+drop policy if exists "Authorized users manage question bank" on public.app_content;
+create policy "Authorized users manage question bank"
+    on public.app_content for all to authenticated
+    using (
+        (content_key = 'questions' and public.has_teacher_permission('questions'))
+        or (content_key = 'interventions' and public.has_teacher_permission('interventions'))
+        or (content_key = 'settings' and public.is_platform_owner())
+    )
+    with check (
+        (content_key = 'questions' and public.has_teacher_permission('questions'))
+        or (content_key = 'interventions' and public.has_teacher_permission('interventions'))
+        or (content_key = 'settings' and public.is_platform_owner())
+    );
+
+drop policy if exists "Public submit assessment results" on public.assessment_attempts;
+create policy "Public submit assessment results"
+    on public.assessment_attempts for insert to anon, authenticated
+    with check (true);
+
+drop policy if exists "Authorized teachers read assessment results" on public.assessment_attempts;
+create policy "Authorized teachers read assessment results"
+    on public.assessment_attempts for select to authenticated
+    using (public.has_teacher_permission('reports'));
+
+drop policy if exists "Owners delete assessment results" on public.assessment_attempts;
+create policy "Owners delete assessment results"
+    on public.assessment_attempts for delete to authenticated
+    using (public.is_platform_owner());
+
+drop policy if exists "Authorized support staff read tickets" on public.support_tickets;
+create policy "Authorized support staff read tickets"
+    on public.support_tickets for select to authenticated
+    using (public.has_teacher_permission('support'));
+
+drop policy if exists "Authorized support staff update tickets" on public.support_tickets;
+create policy "Authorized support staff update tickets"
+    on public.support_tickets for update to authenticated
+    using (public.has_teacher_permission('support'))
+    with check (public.has_teacher_permission('support'));
+
+drop policy if exists "Authorized support staff delete tickets" on public.support_tickets;
+create policy "Authorized support staff delete tickets"
+    on public.support_tickets for delete to authenticated
+    using (public.has_teacher_permission('support'));
+
+create or replace function public.submit_support_ticket(
+    p_request_type text,
+    p_full_name text,
+    p_subject text,
+    p_details text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    new_ticket_code uuid;
+begin
+    if p_request_type not in ('مشكلة', 'مقترح', 'استفسار')
+       or char_length(btrim(p_full_name)) not between 1 and 120
+       or char_length(btrim(p_subject)) not between 1 and 200
+       or char_length(btrim(p_details)) not between 1 and 5000 then
+        raise exception 'بيانات طلب الدعم غير صالحة.';
+    end if;
+
+    insert into public.support_tickets (request_type, full_name, subject, details)
+    values (p_request_type, btrim(p_full_name), btrim(p_subject), btrim(p_details))
+    returning ticket_code into new_ticket_code;
+    return new_ticket_code;
+end;
+$$;
+
+create or replace function public.track_support_ticket(p_ticket_code uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select jsonb_build_object(
+        'number', ticket_code,
+        'status', status,
+        'reply', reply
+    )
+    from public.support_tickets
+    where ticket_code = p_ticket_code;
+$$;
+
+create or replace function public.update_my_display_name(p_display_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    if auth.uid() is null or char_length(btrim(p_display_name)) not between 1 and 120 then
+        raise exception 'الاسم غير صالح.';
+    end if;
+
+    update public.profiles
+    set display_name = btrim(p_display_name)
+    where id = auth.uid()
+      and active;
+end;
+$$;
+
+revoke all on function public.submit_support_ticket(text, text, text, text) from public;
+revoke all on function public.track_support_ticket(uuid) from public;
+revoke all on function public.update_my_display_name(text) from public;
+grant execute on function public.submit_support_ticket(text, text, text, text) to anon, authenticated;
+grant execute on function public.track_support_ticket(uuid) to anon, authenticated;
+grant execute on function public.update_my_display_name(text) to authenticated;

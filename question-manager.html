@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#176b45">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
     <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
     <title>لوحة المعلم/ة | منصة طلاقة</title>
     <link rel="stylesheet" href="ملفات الموقع/styles.css">
@@ -73,10 +73,9 @@
             <div class="panel-heading"><h2>صلاحيات المعلمين والمعلمات</h2></div>
             <form id="teacher-editor" class="editor-card admin-editor field-grid open">
                 <input id="teacher-name" placeholder="اسم المعلم/ة" required>
-                <input id="teacher-username" placeholder="اسم المستخدم" required>
-                <input id="teacher-password" type="password" placeholder="كلمة مرور مؤقتة" required>
                 <input id="teacher-email" type="email" placeholder="البريد الإلكتروني" required>
-                <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض وتحميل التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label><label><input type="checkbox" name="permission" value="permissions"> إدارة صلاحيات المعلمين والمعلمات</label></div>
+                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة ليُنشئ كلمة مروره بنفسه.</p>
+                <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label></div>
                 <button type="submit" class="primary-button">إضافة المعلم/ة</button>
             </form>
             <div id="teacher-list" class="data-list"></div>
@@ -100,14 +99,17 @@
             <form id="account-editor" class="editor-card admin-editor field-grid open">
                 <input id="account-name" placeholder="الاسم الظاهر" required>
                 <input id="account-username" value="HANAA" placeholder="اسم المستخدم" readonly>
-                <input id="account-email" type="email" placeholder="البريد الإلكتروني" required>
-                <button type="submit" class="primary-button">حفظ الاسم والبريد</button>
+                <input id="account-email" type="email" placeholder="بريد تسجيل الدخول" readonly>
+                <button type="submit" class="primary-button">حفظ الاسم الظاهر</button>
             </form>
             <p id="account-message" role="status"></p>
         </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+    <script src="supabase/config.js"></script>
+    <script src="supabase/client.js"></script>
     <script src="ملفات الموقع/assessment-data.js"></script>
-    <script src="ملفات الموقع/teacher-dashboard.js"></script>
+    <script src="ملفات الموقع/teacher-dashboard-cloud.js"></script>
 </body>
 </html>

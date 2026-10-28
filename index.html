@@ -104,20 +104,34 @@
                             </div>
                         </fieldset>
 
+                        <label class="consent-row"><input id="student-data-consent" type="checkbox" required /> أوافق على حفظ الاسم والصف ونتائج الاختبار في قاعدة بيانات المنصة لعرضها على المعلمين المعتمدين.</label>
                         <button type="submit" id="start-diagnosis" disabled>ابدأ الاختبار</button>
                     </form>
                 </section>
             </div>
         </main>
 
+        <script src="supabase/config.js"></script>
         <script>
             const diagnosisForm = document.querySelector('#diagnosis-form');
             const studentName = document.querySelector('#student-name');
+            const dataConsent = document.querySelector('#student-data-consent');
             const startButton = document.querySelector('#start-diagnosis');
+            const config = window.TalalaSupabaseConfig || {};
+            const dataServiceReady = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.url || '')
+                && typeof config.publishableKey === 'string'
+                && (config.publishableKey.startsWith('sb_publishable_') || config.publishableKey.startsWith('eyJ'));
+            if (!dataServiceReady) {
+                const warning = document.createElement('p');
+                warning.className = 'login-error';
+                warning.setAttribute('role', 'alert');
+                warning.textContent = 'لم يتم ربط قاعدة بيانات المنصة بعد؛ لا يمكن بدء اختبار يُحفظ بأمان.';
+                diagnosisForm.append(warning);
+            }
 
             function updateStartButton() {
                 const selectedGrade = diagnosisForm.querySelector('input[name="grade"]:checked');
-                startButton.disabled = studentName.value.trim() === '' || !selectedGrade;
+                startButton.disabled = !dataServiceReady || studentName.value.trim() === '' || !selectedGrade || !dataConsent.checked;
             }
 
             diagnosisForm.addEventListener('input', updateStartButton);
@@ -126,7 +140,7 @@
                 event.preventDefault();
 
                 const selectedGrade = diagnosisForm.querySelector('input[name="grade"]:checked');
-                if (studentName.value.trim() === '' || !selectedGrade) return;
+                if (!dataServiceReady || studentName.value.trim() === '' || !selectedGrade || !dataConsent.checked) return;
 
                 sessionStorage.setItem('talalaStudentName', studentName.value.trim());
                 sessionStorage.setItem('talalaStudentGrade', selectedGrade.value);

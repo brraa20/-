@@ -874,6 +874,20 @@ button,
     border-radius: 14px;
     background: #f7faf7;
 }
+
+.consent-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.7;
+}
+.consent-row input { flex: 0 0 auto; margin-top: 5px; }
+.error,
+.login-error,
+.ticket-result.error,
+.track-result.error,
+#dashboard-status.error { color: #9b302d; }
+#dashboard-status { min-height: 1.5em; margin: 8px 0; }
 .reply-box {
     margin-top: 8px;
     padding: 10px 12px;

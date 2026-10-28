@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#176b45">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
     <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
     <title>دخول المعلم/ة | منصة طلاقة</title>
     <link rel="stylesheet" href="ملفات الموقع/styles.css">
@@ -24,10 +24,10 @@
     <main class="login-shell">
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">دخول المعلم/ة</h1>
-            <p class="local-storage-note">نسخة تجريبية: البيانات محفوظة على هذا الجهاز فقط.</p>
+            <p class="local-storage-note">تسجيل الدخول آمن عبر حساب المنصة. يضيف مالك المنصة حسابات المعلمين ويرسل دعوة إلى بريدهم.</p>
             <form id="teacher-login-form">
-                <label for="username">اسم المستخدم <span class="required-mark" aria-hidden="true">*</span></label>
-                <input id="username" name="username" autocomplete="username" required>
+                <label for="username">البريد الإلكتروني <span class="required-mark" aria-hidden="true">*</span></label>
+                <input id="username" name="username" type="email" autocomplete="username" required>
                 <label for="password">كلمة المرور <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
                 <button type="button" class="forgot" id="forgot-password">نسيت كلمة المرور؟</button>
@@ -36,45 +36,59 @@
             </form>
         </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+    <script src="supabase/config.js"></script>
+    <script src="supabase/client.js"></script>
     <script>
         const form = document.querySelector('#teacher-login-form');
         const error = document.querySelector('#login-error');
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (!window.TalalaBackend.isConfigured) {
+            error.textContent = window.TalalaBackend.configurationMessage;
+            submitButton.disabled = true;
+        }
 
-        form.addEventListener('submit', (event) => {
+        form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            let ownerAccount;
-            let extraAccounts;
             try {
-                ownerAccount = JSON.parse(localStorage.getItem('talalaTeacherAccount') || 'null')
-                    || { name: 'HANAA', username: 'HANAA', password: '11887799' };
-                extraAccounts = JSON.parse(localStorage.getItem('talalaTeacherAccounts') || '[]');
-                if (!Array.isArray(extraAccounts)) throw new Error('Stored teacher accounts must be a list.');
-            } catch (storageError) {
-                error.textContent = 'تعذر قراءة الحسابات المحفوظة. يرجى مراجعة بيانات المتصفح.';
-                console.error('Unable to read teacher accounts from local storage.', storageError);
-                return;
-            }
-            const canSignIn = username.value.trim() === ownerAccount.username && password.value === ownerAccount.password;
-            const matchingTeacher = extraAccounts.find((teacher) => teacher.authorized !== false
-                && teacher.username === username.value.trim()
-                && teacher.password === password.value);
-            if (canSignIn || matchingTeacher) {
-                sessionStorage.setItem('talalaTeacherSession', 'authenticated');
-                sessionStorage.setItem('talalaTeacherRole', canSignIn ? 'owner' : 'teacher');
-                sessionStorage.setItem('talalaTeacherPermissions', JSON.stringify(canSignIn
-                    ? ['reports', 'analytics', 'questions', 'interventions', 'support', 'permissions']
-                    : Array.isArray(matchingTeacher.permissions) ? matchingTeacher.permissions : []));
-                sessionStorage.setItem('talalaTeacherName', canSignIn ? ownerAccount.name : matchingTeacher.name);
+                const supabase = window.TalalaBackend.requireClient();
+                const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                    email: username.value.trim(),
+                    password: password.value
+                });
+                if (signInError) throw signInError;
+
+                const profile = await window.TalalaBackend.getProfile();
+                if (!profile || !profile.active) {
+                    await supabase.auth.signOut();
+                    throw new Error('لم يُفعّل هذا الحساب بعد. تواصل مع مالك المنصة.');
+                }
                 window.location.href = 'question-manager.html';
-                return;
+            } catch (signInError) {
+                error.textContent = signInError.message === window.TalalaBackend?.configurationMessage
+                    ? signInError.message
+                    : signInError.message || 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.';
             }
-            error.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة.';
         });
 
-        document.querySelector('#forgot-password').addEventListener('click', () => {
-            error.textContent = 'تواصل مع مالك المنصة لإعادة تعيين الحساب.';
+        document.querySelector('#forgot-password').addEventListener('click', async () => {
+            error.textContent = '';
+            if (!username.value.trim()) {
+                error.textContent = 'أدخل بريدك الإلكتروني أولًا.';
+                return;
+            }
+            try {
+                const supabase = window.TalalaBackend.requireClient();
+                const { error: resetError } = await supabase.auth.resetPasswordForEmail(username.value.trim(), {
+                    redirectTo: `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}teacher-login.html`
+                });
+                if (resetError) throw resetError;
+                error.textContent = 'إذا كان البريد مسجلًا، ستصلك رسالة لإعادة تعيين كلمة المرور.';
+            } catch (resetError) {
+                error.textContent = resetError.message || 'تعذر إرسال رسالة إعادة التعيين.';
+            }
         });
     </script>
 </body>

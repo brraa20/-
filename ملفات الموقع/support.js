@@ -1,80 +1,71 @@
 const form = document.querySelector('#support-form');
 const ticketResult = document.querySelector('#ticket-result');
 const trackResult = document.querySelector('#track-result');
-const ticketsKey = 'talalaSupportTickets';
+const trackForm = document.querySelector('#track-form');
 
-function loadTickets() {
-    return JSON.parse(localStorage.getItem(ticketsKey) || '[]');
+if (!window.TalalaBackend.isConfigured) {
+    showSupportMessage(ticketResult, window.TalalaBackend.configurationMessage, true);
+    ticketResult.classList.remove('hidden');
+    form.querySelector('button[type="submit"]').disabled = true;
+    trackForm.querySelector('button[type="submit"]').disabled = true;
 }
 
-function saveTickets(tickets) {
-    localStorage.setItem(ticketsKey, JSON.stringify(tickets));
+function showSupportMessage(target, message, isError = false) {
+    target.textContent = message;
+    target.classList.toggle('error', isError);
 }
 
-function escapeHtml(value) {
-    const element = document.createElement('div');
-    element.textContent = value;
-    return element.innerHTML;
-}
-
-function createTicketNumber() {
-    const date = new Date();
-    const stamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-    const serial = String(Math.floor(1000 + Math.random() * 9000));
-    return `TL-${stamp}-${serial}`;
-}
-
-function findTicket(number) {
-    return loadTickets().find((ticket) => ticket.number === number.trim().toUpperCase());
-}
-
-function renderTicket(ticket) {
-    trackResult.innerHTML = `
-        <p><strong>رقم التذكرة:</strong> ${escapeHtml(ticket.number)}</p>
-        <p><strong>الحالة:</strong> ${escapeHtml(ticket.status)}</p>
-        ${ticket.reply ? `<div class="reply-box"><strong>رد مالك المنصة:</strong><br>${escapeHtml(ticket.reply)}</div>` : '<p>لم يتم الرد بعد. ستظهر الردود هنا عند مراجعة الطلب.</p>'}`;
-}
-
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
     event.preventDefault();
 
     const selectedType = form.querySelector('input[name="requestType"]:checked');
-    const fullName = document.querySelector('#full-name').value.trim();
-    const subject = document.querySelector('#subject').value.trim();
-    const details = document.querySelector('#details').value.trim();
-    if (!selectedType || !fullName || !subject || !details) return;
-
     const ticket = {
-        number: createTicketNumber(),
-        type: selectedType.value,
-        fullName,
-        subject,
-        details,
-        status: 'بانتظار الرد',
-        reply: '',
-        createdAt: new Date().toISOString()
+        type: selectedType?.value,
+        fullName: document.querySelector('#full-name').value.trim(),
+        subject: document.querySelector('#subject').value.trim(),
+        details: document.querySelector('#details').value.trim()
     };
+    if (!ticket.type || !ticket.fullName || !ticket.subject || !ticket.details) return;
 
-    const tickets = loadTickets();
-    tickets.unshift(ticket);
-    saveTickets(tickets);
-
-    ticketResult.classList.remove('hidden');
-    ticketResult.innerHTML = `تم إرسال طلبك بنجاح.<br>رقم متابعتك هو <span class="ticket-number">${escapeHtml(ticket.number)}</span><br>احتفظ بهذا الرقم لمتابعة حالة الرد.`;
-    document.querySelector('#ticket-input').value = ticket.number;
-    form.reset();
-    renderTicket(ticket);
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+        const code = await window.TalalaBackend.createTicket(ticket);
+        const ticketNumber = `TL-${code}`;
+        ticketResult.classList.remove('hidden');
+        showSupportMessage(ticketResult, `تم حفظ طلبك في قاعدة البيانات. رقم المتابعة: ${ticketNumber}`);
+        document.querySelector('#ticket-input').value = ticketNumber;
+        form.reset();
+        await trackTicket(ticketNumber);
+    } catch (error) {
+        showSupportMessage(ticketResult, `تعذر حفظ الطلب: ${error.message}`, true);
+        ticketResult.classList.remove('hidden');
+    } finally {
+        submitButton.disabled = false;
+    }
 });
 
-document.querySelector('#track-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const number = document.querySelector('#ticket-input').value.trim();
-    const ticket = findTicket(number);
-    if (ticket) {
-        renderTicket(ticket);
+async function trackTicket(ticketNumber) {
+    const code = ticketNumber.trim().toUpperCase().replace(/^TL-/, '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(code)) {
+        showSupportMessage(trackResult, 'أدخل رقم التذكرة كاملًا كما ظهر عند الإرسال.', true);
         return;
     }
-    trackResult.textContent = number
-        ? 'لم يتم العثور على تذكرة بهذا الرقم في هذا المتصفح.'
-        : 'أدخل رقم التذكرة للبحث عن حالتها.';
+
+    try {
+        const ticket = await window.TalalaBackend.trackTicket(code);
+        if (!ticket) {
+            showSupportMessage(trackResult, 'لم يتم العثور على تذكرة بهذا الرقم.');
+            return;
+        }
+        const reply = ticket.reply ? `\nرد الدعم: ${ticket.reply}` : '\nلم يتم الرد بعد.';
+        showSupportMessage(trackResult, `الحالة: ${ticket.status}${reply}`);
+    } catch (error) {
+        showSupportMessage(trackResult, `تعذر متابعة التذكرة: ${error.message}`, true);
+    }
+}
+
+trackForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void trackTicket(document.querySelector('#ticket-input').value);
 });
