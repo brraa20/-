@@ -333,6 +333,11 @@ function saveStudentReport(diagnosticResults, finalResults) {
 }
 
 nextButton.addEventListener('click', () => {
+    if (state.stage === 'intervention') {
+        startFinalTest();
+        return;
+    }
+
     const questions = getQuestions();
     const answers = getAnswers();
     if (answers[state.index] === undefined) return;
@@ -344,7 +349,6 @@ nextButton.addEventListener('click', () => {
     }
 
     if (state.stage === 'diagnostic') renderIntervention();
-    else if (state.stage === 'intervention') startFinalTest();
     else renderResults();
 });
 
