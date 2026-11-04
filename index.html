@@ -145,6 +145,20 @@
                 sessionStorage.removeItem('talalaAssessmentStarted');
                 window.location.href = 'assessment-instructions.html';
             });
+        / / دالة تسجيل الدخول للمعلم/ة باستخدام supabase
+        async function teacherLogin(email, password) {
+            if (!dataServiceReady) {
+                throw new Error('قاعدة بيانات المنصة غير متاحة.');
+            }
+            const { createClient } = window.supabase;
+            const supabase = createClient(config.url, config.publishableKey);
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                throw new Error(error.message);
+            }
+            return data;
+        }
+        
         </script>
 
     </body>
