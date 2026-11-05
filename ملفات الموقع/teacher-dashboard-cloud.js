@@ -41,6 +41,19 @@ function escapeHtml(value) {
     return element.innerHTML;
 }
 
+function processStepsSummary(steps = []) {
+    return steps.map((step) => {
+        const results = Array.isArray(step.results)
+            ? step.results.map((result) => `${result.name}: ${result.percent}%`).join('، ')
+            : '';
+        const skills = Array.isArray(step.skills)
+            ? step.skills.map((skill) => typeof skill === 'string' ? skill : skill.name).join('، ')
+            : '';
+        const details = results || skills;
+        return `- ${step.step}${step.round ? ` (الجولة ${step.round})` : ''}${details ? `: ${details}` : ''}`;
+    }).join('\n');
+}
+
 function setPanel(panelName) {
     document.querySelectorAll('.dashboard-tab').forEach((button) => {
         const active = button.dataset.panel === panelName;
@@ -266,6 +279,7 @@ async function initialize() {
                     diagnostic_percent: attempt.diagnostic_percent,
                     progress: attempt.progress,
                     weak_skills: attempt.weak_skills,
+                    process_steps: attempt.process_steps || [],
                     date: attempt.created_at.slice(0, 10)
                 });
             }
@@ -305,7 +319,8 @@ document.querySelector('#student-report-list').addEventListener('click', (event)
     const button = event.target.closest('[data-report]');
     const report = reports.find((item) => item.id === button?.dataset.report);
     if (report) {
-        alert(`تقرير ${report.student_name}\nالصف: ${report.grade}\nالمحاولات: ${report.attempts}\nالنسبة: ${report.percent}%\nالتقدم: ${report.progress}\nمهارات تحتاج مراجعة: ${report.weak_skills.join('، ') || 'لا توجد'}`);
+        const steps = processStepsSummary(report.process_steps);
+        alert(`تقرير ${report.student_name}\nالصف: ${report.grade}\nالمحاولات: ${report.attempts}\nالنسبة: ${report.percent}%\nالتقدم: ${report.progress}\nمهارات تحتاج مراجعة: ${report.weak_skills.join('، ') || 'لا توجد'}\n\nخطوات آخر محاولة:\n${steps || 'لا تتوفر تفاصيل الخطوات.'}`);
     }
 });
 document.querySelector('#student-report-list').addEventListener('click', async (event) => {
@@ -328,6 +343,7 @@ document.querySelector('#student-report-list').addEventListener('click', async (
                     diagnostic_percent: attempt.diagnostic_percent,
                     progress: attempt.progress,
                     weak_skills: attempt.weak_skills,
+                    process_steps: attempt.process_steps || [],
                     date: attempt.created_at.slice(0, 10)
                 });
             }

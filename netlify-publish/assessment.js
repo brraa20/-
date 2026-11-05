@@ -1,10 +1,6 @@
 const studentName = sessionStorage.getItem('talalaStudentName');
 const studentGrade = sessionStorage.getItem('talalaStudentGrade');
 const data = window.TalalaAssessmentData;
-const customQuestions = JSON.parse(localStorage.getItem('talalaReadingQuestionBank') || 'null');
-if (customQuestions && ['diagnostic', 'intervention', 'final'].every((stage) => Array.isArray(customQuestions[stage]))) {
-    data.questions = customQuestions;
-}
 
 if (!studentName || !studentGrade || sessionStorage.getItem('talalaAssessmentStarted') !== 'true') {
     window.location.replace(studentName && studentGrade ? 'assessment-instructions.html' : 'index.html');
@@ -16,12 +12,23 @@ const state = {
     answers: [],
     mistakes: [],
     finalAnswers: [],
-    finalQuestions: []
+    finalQuestions: [],
+    diagnosticResults: [],
+    currentSkillResults: [],
+    targetSkillIds: [],
+    interventionQuestions: [],
+    interventionAnswers: [],
+    interventionHistory: [],
+    processSteps: []
 };
+
+const masteryThreshold = 80;
 
 const titles = {
     diagnostic: 'الاختبار التشخيصي',
     intervention: 'التدخل والعلاج والتنمية',
+    reassessment: 'إعادة تقييم المهارات',
+    interventionOutcome: 'نتائج إعادة التقييم',
     final: 'الاختبار الشامل',
     results: 'أثر التعلم والتقدم'
 };
@@ -58,11 +65,13 @@ function skillById(id) {
 
 function getQuestions() {
     if (state.stage === 'diagnostic') return data.questions.diagnostic;
+    if (state.stage === 'reassessment') return state.interventionQuestions;
     if (state.stage === 'final') return state.finalQuestions;
-    return data.questions.intervention;
+    return [];
 }
 
 function getAnswers() {
+    if (state.stage === 'reassessment') return state.interventionAnswers;
     return state.stage === 'final' ? state.finalAnswers : state.answers;
 }
 
@@ -76,7 +85,9 @@ function progress() {
     progressBar.parentElement.setAttribute('aria-valuenow', String(percentage));
     stageLabel.textContent = state.stage === 'diagnostic'
         ? 'تشخيص المهارات'
-        : state.stage === 'intervention' ? 'التدخل المخصص' : 'الاختبار الشامل';
+        : state.stage === 'reassessment'
+            ? `إعادة تقييم المهارات — الجولة ${state.interventionHistory.length + 1}`
+            : state.stage === 'final' ? 'الاختبار الشامل بعد الإتقان' : 'التدخل المخصص';
 }
 
 function renderQuestion() {
@@ -114,20 +125,31 @@ function renderQuestion() {
     previousButton.hidden = state.index === 0;
     nextButton.disabled = answers[state.index] === undefined;
     nextButton.textContent = state.index === questions.length - 1
-        ? (state.stage === 'diagnostic' ? 'تسليم التشخيص' : 'تسليم الاختبار الشامل')
+        ? state.stage === 'diagnostic'
+            ? 'تسليم التشخيص'
+            : state.stage === 'reassessment' ? 'تسليم إعادة التقييم' : 'تسليم الاختبار الشامل'
         : 'السؤال التالي';
     progress();
 }
 
-function calculateResults(questions, answers) {
-    return data.skills.map((skill) => {
+function calculateResults(questions, answers, skillIds = data.skills.map((skill) => skill.id)) {
+    return data.skills.filter((skill) => skillIds.includes(skill.id)).map((skill) => {
         const skillQuestions = questions
             .map((question, index) => ({ question, index }))
             .filter(({ question }) => question.skill === skill.id);
         const correct = skillQuestions.filter(({ question, index }) => answers[index] === question.answer).length;
         const percent = skillQuestions.length ? Math.round((correct / skillQuestions.length) * 100) : 0;
-        const mastery = percent >= 80 ? 'إتقان مرتفع' : percent >= 60 ? 'إتقان متطور يحتاج دعمًا' : 'يحتاج إلى تدخل مخصص';
+        const mastery = percent >= masteryThreshold ? 'بلغ حد الإتقان' : percent >= 60 ? 'يحتاج إلى تعزيز' : 'يحتاج إلى تدخل مخصص';
         return { ...skill, correct, total: skillQuestions.length, percent, mastery };
+    });
+}
+
+function recordProcessStep(step, round, details = {}) {
+    state.processSteps.push({
+        step,
+        round,
+        recorded_at: new Date().toISOString(),
+        ...details
     });
 }
 
@@ -159,27 +181,80 @@ const skillInterventions = {
     }
 };
 
+async function initializeAssessment() {
+    try {
+        let interventions;
+        if (window.TalalaBackend?.isConfigured) {
+            const questions = await window.TalalaBackend.loadContent('questions');
+            if (questions && ['diagnostic', 'intervention', 'final'].every((stage) => Array.isArray(questions[stage]))) {
+                data.questions = questions;
+            }
+            interventions = await window.TalalaBackend.loadContent('interventions');
+        } else {
+            const localQuestions = JSON.parse(localStorage.getItem('talalaReadingQuestionBank') || 'null');
+            if (localQuestions && ['diagnostic', 'intervention', 'final'].every((stage) => Array.isArray(localQuestions[stage]))) {
+                data.questions = localQuestions;
+            }
+            interventions = JSON.parse(localStorage.getItem('talalaInterventionBank') || '[]');
+        }
+        if (Array.isArray(interventions)) {
+            interventions.forEach((intervention) => {
+                if (skillInterventions[intervention.skill] && intervention.content) {
+                    skillInterventions[intervention.skill].action = intervention.content;
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Unable to load the shared question bank.', error);
+        content.innerHTML = `<p class="error" role="alert">تعذر تحميل بنك الأسئلة المشترك: ${escapeHtml(error.message)}</p>`;
+        previousButton.hidden = true;
+        nextButton.hidden = true;
+        return;
+    }
+    renderQuestion();
+}
+
 function renderIntervention() {
     state.stage = 'intervention';
     state.index = 0;
     title.textContent = titles.intervention;
-    progressLabel.textContent = 'شرح المهارات ومراجعة الأخطاء';
+    const round = state.interventionHistory.length + 1;
+    progressLabel.textContent = state.interventionHistory.length
+        ? `خطة علاج الجولة ${round} للمهارات التي لم تبلغ الإتقان`
+        : 'شرح التشخيص وخطة تنمية المهارات';
     progressBar.style.width = '100%';
     stageLabel.textContent = 'التدخل المخصص';
     previousButton.hidden = true;
 
-    const mistakes = data.questions.diagnostic
-        .map((question, index) => ({ question, answer: state.answers[index] }))
-        .filter(({ question, answer }) => answer !== question.answer);
-
-    const skillResults = calculateResults(data.questions.diagnostic, state.answers);
-    state.diagnosticResults = skillResults;
-    const weakSkills = skillResults.filter((skill) => skill.percent < 80);
+    const mistakes = state.interventionHistory.length
+        ? state.lastInterventionMistakes || []
+        : data.questions.diagnostic
+            .map((question, index) => ({ question, answer: state.answers[index] }))
+            .filter(({ question, answer }) => answer !== question.answer);
+    const weakSkills = state.currentSkillResults.filter((skill) => skill.percent < masteryThreshold);
+    state.targetSkillIds = weakSkills.map((skill) => skill.id);
+    if (weakSkills.length) {
+        recordProcessStep('خطة علاج وتنمية المهارات', round, {
+            skills: weakSkills.map((skill) => ({
+                id: skill.id,
+                name: skill.name,
+                diagnostic_percent: skill.percent,
+                goal: skillInterventions[skill.id].goal,
+                activity: skillInterventions[skill.id].action,
+                example: skillInterventions[skill.id].example
+            }))
+        });
+    } else {
+        recordProcessStep('تحقق حد الإتقان قبل الاختبار الشامل', round - 1, {
+            results: state.currentSkillResults,
+            threshold: masteryThreshold
+        });
+    }
 
     content.innerHTML = `
         <section class="intervention-card">
-            <h2>${weakSkills.length ? 'خطة التدخل المخصص' : 'مراجعة متوازنة للمهارات'}</h2>
-            <p class="learning-path">المهارة ← إتقان التشخيص ← التدخل المقترح ← مثال تطبيقي ← الإتقان اللاحق ← الأثر</p>
+            <h2>${weakSkills.length ? `خطة العلاج والتنمية — الجولة ${round}` : 'تحقق الإتقان في جميع المهارات'}</h2>
+            <p class="learning-path">التشخيص ← شرح الأخطاء ← علاج المهارات الأقل من ${masteryThreshold}% ← إعادة القياس حتى الإتقان ← الاختبار الشامل</p>
             ${weakSkills.length ? `
                 <div class="lesson-grid">
                     ${weakSkills.map((skill) => {
@@ -188,13 +263,13 @@ function renderIntervention() {
                             <article class="lesson-block intervention-plan">
                                 <span class="skill-tag">المهارة: ${escapeHtml(skill.name)}</span>
                                 <div class="mastery-row"><strong>${skill.percent}%</strong><span>${escapeHtml(skill.mastery)}</span></div>
-                                <h2>الهدف التدريبي</h2><p>${escapeHtml(guide.goal)}</p>
-                                <h2>التدخل المقترح</h2><p>${escapeHtml(guide.action)}</p>
+                                <h2>هدف العلاج</h2><p>${escapeHtml(guide.goal)}</p>
+                                <h2>نشاط التنمية والتعزيز</h2><p>${escapeHtml(guide.action)}</p>
                                 <h2>مثال تطبيقي</h2><p class="practice-example">${escapeHtml(guide.example)}</p>
                             </article>`;
                     }).join('')}
-                </div>` : '<p>أظهر التشخيص إتقانًا مرتفعًا في المهارات الخمس، وسننتقل إلى الاختبار الشامل لقياس الأثر.</p>'}
-            <h2 style="margin-top:24px">الأسئلة التي أُجبت عليها بشكل خاطئ</h2>
+                </div>` : `<p>بلغت جميع المهارات حد الإتقان (${masteryThreshold}% فأعلى). يمكنك الانتقال إلى الاختبار الشامل.</p>`}
+            <h2>مراجعة الإجابات التي تحتاج شرحًا</h2>
             <div class="error-review">
                 ${mistakes.length ? mistakes.map(({ question, answer }) => `
                     <article class="error-item">
@@ -203,12 +278,96 @@ function renderIntervention() {
                         <span class="correct-answer">الإجابة الصحيحة: ${escapeHtml(question.choices[question.answer])}</span></p>
                         <p>${escapeHtml(question.explanation)}</p>
                     </article>
-                `).join('') : '<p>لم تقع أي أخطاء في التشخيص، سننتقل إلى التطبيق الشامل.</p>'}
+                `).join('') : '<p>لا توجد إجابات خاطئة في هذه الجولة.</p>'}
             </div>
         </section>`;
 
     nextButton.disabled = false;
-    nextButton.textContent = 'ابدأ الاختبار الشامل';
+    nextButton.textContent = weakSkills.length ? 'ابدأ إعادة تقييم المهارات' : 'ابدأ الاختبار الشامل';
+}
+
+function startInterventionAssessment() {
+    const round = state.interventionHistory.length + 1;
+    const questionPool = [
+        ...data.questions.intervention,
+        ...data.questions.diagnostic,
+        ...data.questions.final
+    ];
+    const selectedQuestions = state.targetSkillIds.flatMap((skillId) => {
+        const seen = new Set();
+        return shuffle(questionPool.filter((question) => question.skill === skillId))
+            .filter((question) => {
+                if (seen.has(question.text)) return false;
+                seen.add(question.text);
+                return true;
+            });
+    });
+
+    if (!selectedQuestions.length || state.targetSkillIds.some((skillId) =>
+        !selectedQuestions.some((question) => question.skill === skillId))) {
+        content.innerHTML = '<p class="error" role="alert">لا تتوفر أسئلة كافية لإعادة تقييم المهارات المستهدفة. يرجى إبلاغ المعلم/ة لمراجعة بنك الأسئلة.</p>';
+        previousButton.hidden = true;
+        nextButton.hidden = true;
+        return;
+    }
+
+    state.stage = 'reassessment';
+    state.index = 0;
+    state.interventionQuestions = selectedQuestions;
+    state.interventionAnswers = [];
+    title.textContent = titles.reassessment;
+    recordProcessStep('بدء إعادة التقييم بعد العلاج', round, {
+        skills: state.targetSkillIds,
+        question_count: selectedQuestions.length,
+        threshold: masteryThreshold
+    });
+    renderQuestion();
+}
+
+function renderInterventionOutcome() {
+    const round = state.interventionHistory.length;
+    const results = state.interventionHistory[round - 1].results;
+    const remainingSkills = state.currentSkillResults.filter((skill) => skill.percent < masteryThreshold);
+    const mistakes = state.interventionQuestions
+        .map((question, index) => ({ question, answer: state.interventionAnswers[index] }))
+        .filter(({ question, answer }) => answer !== question.answer);
+
+    state.stage = 'interventionOutcome';
+    state.lastInterventionMistakes = mistakes;
+    title.textContent = titles.interventionOutcome;
+    progressLabel.textContent = `نتائج إعادة التقييم — الجولة ${round}`;
+    progressBar.style.width = '100%';
+    stageLabel.textContent = 'قياس أثر العلاج';
+    previousButton.hidden = true;
+    content.innerHTML = `
+        <section class="intervention-card">
+            <h2>${remainingSkills.length ? 'تحتاج بعض المهارات إلى علاج إضافي' : 'تحقق الإتقان في جميع المهارات'}</h2>
+            <p>حد الإتقان المطلوب هو ${masteryThreshold}% في كل مهارة قبل الانتقال إلى الاختبار الشامل.</p>
+            <div class="lesson-grid">
+                ${results.map((result) => `
+                    <article class="lesson-block">
+                        <span class="skill-tag">${escapeHtml(result.name)}</span>
+                        <div class="mastery-row"><strong>${result.percent}%</strong><span>${result.correct} من ${result.total} إجابات صحيحة</span></div>
+                        <p>${result.percent >= masteryThreshold ? 'بلغت المهارة حد الإتقان.' : 'ستتكرر خطة العلاج وإعادة التقييم لهذه المهارة.'}</p>
+                    </article>
+                `).join('')}
+            </div>
+            <h2>شرح إجابات إعادة التقييم</h2>
+            <div class="error-review">
+                ${mistakes.length ? mistakes.map(({ question, answer }) => `
+                    <article class="error-item">
+                        <strong>${escapeHtml(question.text)}</strong>
+                        <p class="error-answer">إجابتك: ${escapeHtml(question.choices[answer] ?? 'لم تُجب')}<br>
+                        <span class="correct-answer">الإجابة الصحيحة: ${escapeHtml(question.choices[question.answer])}</span></p>
+                        <p>${escapeHtml(question.explanation)}</p>
+                    </article>
+                `).join('') : '<p>أُجبت عن جميع أسئلة المهارات المستهدفة إجابة صحيحة.</p>'}
+            </div>
+        </section>`;
+    nextButton.disabled = false;
+    nextButton.textContent = remainingSkills.length
+        ? 'كرّر العلاج للمهارات غير المتقنة'
+        : 'انتقل إلى الاختبار الشامل';
 }
 
 function buildFinalQuestions() {
@@ -238,11 +397,18 @@ function buildFinalQuestions() {
 }
 
 function startFinalTest() {
+    const remainingSkills = state.currentSkillResults.filter((skill) => skill.percent < masteryThreshold);
+    if (remainingSkills.length) {
+        renderIntervention();
+        return;
+    }
+
     state.stage = 'final';
     state.index = 0;
     state.finalAnswers = [];
     title.textContent = titles.final;
     buildFinalQuestions();
+    content.textContent = 'جار تحميل الاختبار...';
     renderQuestion();
 }
 
@@ -254,20 +420,34 @@ function renderResults() {
     stageLabel.textContent = 'نتائج التعلم';
     previousButton.hidden = true;
 
-    const diagnosticResults = state.diagnosticResults || calculateResults(data.questions.diagnostic, state.answers);
+    const diagnosticResults = state.diagnosticResults.length
+        ? state.diagnosticResults
+        : calculateResults(data.questions.diagnostic, state.answers);
     const finalResults = calculateResults(state.finalQuestions, state.finalAnswers);
+    recordProcessStep('الاختبار الشامل بعد تحقق الإتقان', state.interventionHistory.length, {
+        results: finalResults,
+        threshold_before_comprehensive_test: masteryThreshold
+    });
     const impactResults = finalResults.map((result, index) => {
         const difference = result.percent - diagnosticResults[index].percent;
         const impact = difference >= 15 ? 'تحسن ملحوظ' : difference >= 5 ? 'تحسن تدريجي' : difference >= -4 ? 'استقرار الإتقان' : 'يحتاج دعمًا إضافيًا';
         return { ...result, difference, impact };
     });
-    saveStudentReport(diagnosticResults, finalResults);
+    saveStudentReport(diagnosticResults, finalResults)
+        .then(() => {
+            document.querySelector('#report-save-status').textContent = 'حُفظت النتيجة في قاعدة بيانات المنصة.';
+        })
+        .catch((error) => {
+            console.error('Unable to save the student assessment result.', error);
+            document.querySelector('#report-save-status').textContent = `تعذر حفظ النتيجة؛ لم تصل إلى المعلمين: ${error.message}`;
+        });
 
     content.innerHTML = `
         <section class="results-card">
             <div class="result-header">
                 <div><h2>نتائج الطالب/ة</h2><p>${escapeHtml(studentName)} • ${escapeHtml(studentGrade)}</p></div>
             </div>
+            <p>جولات العلاج وإعادة التقييم المكتملة قبل الاختبار الشامل: ${state.interventionHistory.length}.</p>
             <div class="results-grid">
                 ${impactResults.map((result) => `
                     <article class="skill-result">
@@ -293,7 +473,7 @@ function renderResults() {
                     </div>
                 </div>
             </div>
-            <p class="local-storage-note">حُفظ هذا الملخص في هذا المتصفح فقط.</p>
+            <p class="local-storage-note" id="report-save-status" role="status">جار حفظ النتيجة في قاعدة بيانات المنصة...</p>
             <div class="action-row">
                 <button type="button" class="action-button" id="print-results">طباعة التقرير أو حفظه PDF</button>
             </div>
@@ -303,38 +483,61 @@ function renderResults() {
     document.querySelector('#print-results').addEventListener('click', () => window.print());
 }
 
-function saveStudentReport(diagnosticResults, finalResults) {
-    const reportsKey = 'talalaStudentReports';
-    const reports = JSON.parse(localStorage.getItem(reportsKey) || '[]');
+async function saveStudentReport(diagnosticResults, finalResults) {
     const diagnosticTotal = diagnosticResults.reduce((total, result) => total + result.total, 0);
     const diagnosticCorrect = diagnosticResults.reduce((total, result) => total + result.correct, 0);
     const finalTotal = finalResults.reduce((total, result) => total + result.total, 0);
     const finalCorrect = finalResults.reduce((total, result) => total + result.correct, 0);
     const diagnosticPercent = diagnosticTotal ? Math.round((diagnosticCorrect / diagnosticTotal) * 100) : 0;
     const percent = finalTotal ? Math.round((finalCorrect / finalTotal) * 100) : 0;
-    const weakSkills = diagnosticResults
+    const weakSkills = finalResults
         .filter((result) => result.percent < 80)
         .map((result) => result.name);
-    const existingIndex = reports.findIndex((report) => report.name === studentName && report.grade === studentGrade);
-    const attempts = existingIndex >= 0 ? (Number(reports[existingIndex].attempts) || 0) + 1 : 1;
     const report = {
+        student_name: studentName,
+        grade: studentGrade,
+        percent,
+        diagnostic_percent: diagnosticPercent,
+        progress: percent >= 80 ? 'متقدم' : percent >= 60 ? 'قيد التحسن' : 'يحتاج إلى دعم',
+        weak_skills: weakSkills,
+        diagnostic_results: diagnosticResults,
+        final_results: finalResults,
+        process_steps: state.processSteps
+    };
+    if (window.TalalaBackend?.isConfigured) {
+        await window.TalalaBackend.saveAttempt(report);
+        return;
+    }
+
+    const reportsKey = 'talalaStudentReports';
+    const reports = JSON.parse(localStorage.getItem(reportsKey) || '[]');
+    const existingIndex = reports.findIndex((item) => item.name === studentName && item.grade === studentGrade);
+    const attempts = existingIndex >= 0 ? (Number(reports[existingIndex].attempts) || 0) + 1 : 1;
+    const localReport = {
         name: studentName,
         grade: studentGrade,
         attempts,
         percent,
-        diagnosticPercent,
-        progress: percent >= 80 ? 'متقدم' : percent >= 60 ? 'قيد التحسن' : 'يحتاج إلى دعم',
+        diagnosticPercent: diagnosticPercent,
+        progress: report.progress,
         date: new Date().toISOString().slice(0, 10),
-        weakSkills
+        weakSkills: weakSkills,
+        processSteps: state.processSteps
     };
     if (existingIndex >= 0) reports.splice(existingIndex, 1);
-    reports.unshift(report);
+    reports.unshift(localReport);
     localStorage.setItem(reportsKey, JSON.stringify(reports));
 }
 
 nextButton.addEventListener('click', () => {
     if (state.stage === 'intervention') {
-        startFinalTest();
+        if (state.targetSkillIds.length) startInterventionAssessment();
+        else startFinalTest();
+        return;
+    }
+    if (state.stage === 'interventionOutcome') {
+        if (state.currentSkillResults.some((skill) => skill.percent < masteryThreshold)) renderIntervention();
+        else startFinalTest();
         return;
     }
 
@@ -348,8 +551,51 @@ nextButton.addEventListener('click', () => {
         return;
     }
 
-    if (state.stage === 'diagnostic') renderIntervention();
-    else renderResults();
+    if (state.stage === 'diagnostic') {
+        state.diagnosticResults = calculateResults(data.questions.diagnostic, state.answers);
+        state.currentSkillResults = state.diagnosticResults.map((result) => ({ ...result }));
+        const mistakes = data.questions.diagnostic
+            .map((question, index) => ({
+                question: question.text,
+                answer: question.choices[state.answers[index]] ?? 'لم يُجب',
+                correct_answer: question.choices[question.answer],
+                explanation: question.explanation,
+                skill: skillById(question.skill)?.name || question.skill
+            }))
+            .filter((item, index) => state.answers[index] !== data.questions.diagnostic[index].answer);
+        recordProcessStep('المحاولة التشخيصية', 0, {
+            results: state.diagnosticResults,
+            threshold: masteryThreshold
+        });
+        recordProcessStep('شرح الأخطاء والتغذية الراجعة', 0, { mistakes });
+        renderIntervention();
+    } else if (state.stage === 'reassessment') {
+        const round = state.interventionHistory.length + 1;
+        const results = calculateResults(
+            state.interventionQuestions,
+            state.interventionAnswers,
+            state.targetSkillIds
+        );
+        state.interventionHistory.push({
+            round,
+            target_skill_ids: [...state.targetSkillIds],
+            results
+        });
+        state.currentSkillResults = state.currentSkillResults.map((previous) =>
+            results.find((result) => result.id === previous.id) || previous
+        );
+        const passedSkills = results.filter((result) => result.percent >= masteryThreshold).map((result) => result.id);
+        const remainingSkills = state.currentSkillResults.filter((result) => result.percent < masteryThreshold).map((result) => result.id);
+        recordProcessStep('نتائج إعادة التقييم بعد العلاج', round, {
+            results,
+            passed_skills: passedSkills,
+            remaining_skills: remainingSkills,
+            threshold: masteryThreshold
+        });
+        renderInterventionOutcome();
+    } else {
+        renderResults();
+    }
 });
 
 previousButton.addEventListener('click', () => {
@@ -359,4 +605,5 @@ previousButton.addEventListener('click', () => {
     }
 });
 
-renderQuestion();
+content.textContent = 'جار تحميل الاختبار...';
+void initializeAssessment();

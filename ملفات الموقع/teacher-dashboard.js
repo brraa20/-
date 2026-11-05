@@ -123,7 +123,17 @@ document.querySelector('#student-report-list').addEventListener('click', (event)
     const button = event.target.closest('[data-report]');
     if (!button) return;
     const report = reports.find((item) => item.name === button.dataset.report);
-    alert(`تقرير ${report.name}\nالصف: ${report.grade}\nالمحاولات: ${report.attempts}\nالنسبة: ${report.percent}%\nالتقدم: ${report.progress}\nأكثر مهارة تحتاج مراجعة: ${(report.weakSkills || []).join('، ') || 'لا توجد'}`);
+    const steps = (report.processSteps || []).map((step) => {
+        const results = Array.isArray(step.results)
+            ? step.results.map((result) => `${result.name}: ${result.percent}%`).join('، ')
+            : '';
+        const skills = Array.isArray(step.skills)
+            ? step.skills.map((skill) => typeof skill === 'string' ? skill : skill.name).join('، ')
+            : '';
+        const details = results || skills;
+        return `- ${step.step}${step.round ? ` (الجولة ${step.round})` : ''}${details ? `: ${details}` : ''}`;
+    }).join('\n');
+    alert(`تقرير ${report.name}\nالصف: ${report.grade}\nالمحاولات: ${report.attempts}\nالنسبة: ${report.percent}%\nالتقدم: ${report.progress}\nأكثر مهارة تحتاج مراجعة: ${(report.weakSkills || []).join('، ') || 'لا توجد'}\n\nخطوات آخر محاولة:\n${steps || 'لا تتوفر تفاصيل الخطوات.'}`);
 });
 
 function renderAnalytics() {

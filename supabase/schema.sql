@@ -99,10 +99,15 @@ create table if not exists public.assessment_attempts (
     diagnostic_percent smallint not null check (diagnostic_percent between 0 and 100),
     progress text not null check (progress in ('متقدم', 'قيد التحسن', 'يحتاج إلى دعم')),
     weak_skills text[] not null default '{}',
+    process_steps jsonb not null default '[]'::jsonb check (jsonb_typeof(process_steps) = 'array'),
     created_at timestamptz not null default now(),
     check (jsonb_typeof(diagnostic_results) = 'array'),
     check (jsonb_typeof(final_results) = 'array')
 );
+
+alter table public.assessment_attempts
+    add column if not exists process_steps jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(process_steps) = 'array');
 
 create index if not exists assessment_attempts_created_at_idx
     on public.assessment_attempts (created_at desc);

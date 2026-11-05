@@ -64,7 +64,7 @@
             const supabase = this.requireClient();
             return await check(supabase
                 .from('assessment_attempts')
-                .select('id, student_name, grade, percent, diagnostic_percent, progress, weak_skills, created_at')
+                .select('id, student_name, grade, percent, diagnostic_percent, progress, weak_skills, process_steps, created_at')
                 .order('created_at', { ascending: false })
                 .limit(5000));
         },
