@@ -10,6 +10,24 @@
         <link rel="stylesheet" href="ملفات الموقع/styles.css" />
         <link rel="stylesheet" href="ملفات الموقع/theme.css" />
         <title>منصة طلاقة</title>
+        <script>
+            (() => {
+                const query = new URLSearchParams(window.location.search);
+                const hash = new URLSearchParams(window.location.hash.slice(1));
+                const flow = query.get('type') || hash.get('type');
+                const targetPage = flow === 'invite'
+                    ? 'create-password.html'
+                    : flow === 'recovery'
+                        ? 'update-password.html'
+                        : null;
+                if (!targetPage) return;
+
+                const target = new URL(targetPage, window.location.href);
+                target.search = window.location.search;
+                target.hash = window.location.hash;
+                window.location.replace(target.href);
+            })();
+        </script>
     </head>
     <body>
 
