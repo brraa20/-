@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#176b45">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <link rel="icon" href="talala-logo.svg" type="image/svg+xml">
+    <title>منصة الدعم والتواصل | منصة طلاقة</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="index.html">
+            <img src="talala-logo.svg" alt="">
+            <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">نحن هنا للمساندة</span></span>
+        </a>
+        <nav aria-label="التنقل الرئيسي">
+            <ul><li><a href="index.html">الرئيسية</a></li><li><a href="teacher-login.html">دخول المعلم/ة</a></li></ul>
+        </nav>
+    </header>
+    <main class="support-shell">
+        <h1>الدعم والمساندة</h1>
+        <section class="support-card">
+            <form id="support-form" class="support-form">
+                <fieldset>
+                    <legend>نوع الطلب <span class="required-mark" aria-hidden="true">*</span></legend>
+                    <div class="type-grid">
+                        <input class="request-type" type="radio" name="requestType" id="issue" value="مشكلة" required><label for="issue">مشكلة</label>
+                        <input class="request-type" type="radio" name="requestType" id="suggestion" value="مقترح"><label for="suggestion">مقترح</label>
+                        <input class="request-type" type="radio" name="requestType" id="inquiry" value="استفسار"><label for="inquiry">استفسار</label>
+                    </div>
+                </fieldset>
+                <label for="full-name">الاسم <span class="required-mark" aria-hidden="true">*</span></label>
+                <input id="full-name" name="fullName" autocomplete="name" required>
+                <label for="subject">الموضوع <span class="required-mark" aria-hidden="true">*</span></label>
+                <input id="subject" name="subject" required>
+                <label for="details">التفاصيل <span class="required-mark" aria-hidden="true">*</span></label>
+                <textarea id="details" name="details" required></textarea>
+                <button type="submit" class="send-button">إرسال الطلب</button>
+            </form>
+            <div id="ticket-result" class="ticket-result hidden" aria-live="polite"></div>
+            <p class="local-storage-note">يُحفظ الطلب في قاعدة بيانات المنصة ليتمكن فريق الدعم من مراجعته.</p>
+            <section class="track-section">
+                <h2>متابعة حالة التذكرة</h2>
+                <form id="track-form" class="track-row">
+                    <input id="ticket-input" type="text" inputmode="text" maxlength="39" aria-label="رقم التذكرة" placeholder="رقم التذكرة">
+                    <button type="submit" id="track-ticket" aria-label="البحث عن التذكرة">بحث</button>
+                </form>
+                <div id="track-result" class="track-result" aria-live="polite"></div>
+            </section>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+    <script src="supabase/config.js"></script>
+    <script src="supabase/client.js"></script>
+    <script src="support.js"></script>
+</body>
+</html>

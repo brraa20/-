@@ -86,15 +86,18 @@ function renderReports() {
     const filtered = reports.filter((report) =>
         (!query || report.student_name.includes(query))
         && (!grade || report.grade === grade));
-    document.querySelector('#tested-count').textContent = `${filtered.length} طالبًا/طالبة`;
+    document.querySelector('#tested-count').textContent =
+        filtered.length ? `${filtered.length} طالب/ة` : 'لا توجد نتائج';
     document.querySelector('#student-report-list').innerHTML = filtered.length
         ? filtered.map((report) => `
             <tr>
                 <td>${escapeHtml(report.student_name)}</td><td>${escapeHtml(report.grade)}</td>
                 <td>${report.attempts}</td><td>${report.percent}%</td>
                 <td>${escapeHtml(report.progress)}</td><td>${escapeHtml(report.date)}</td>
-                <td><button type="button" class="secondary-button" data-report="${escapeHtml(report.id)}">عرض التقرير</button>
-                ${profile.role === 'owner' ? `<button type="button" class="danger-button" data-delete-report="${escapeHtml(report.id)}">حذف</button>` : ''}</td>
+                <td class="report-actions-cell">
+                    <button type="button" class="secondary-button" data-preview-report="${escapeHtml(report.id)}">معاينة وطباعة</button>
+                    <button type="button" class="danger-button" data-delete-report="${escapeHtml(report.id)}">حذف النتائج</button>
+                </td>
             </tr>`).join('')
         : '<tr><td colspan="7" class="empty-state">لا توجد نتائج مطابقة.</td></tr>';
 }
@@ -232,7 +235,7 @@ async function initialize() {
 
     profile.permissions = profile.permissions || [];
     document.querySelector('#dashboard-account').textContent =
-        `مرحبًا ${profile.display_name || profile.email} • إدارة التعلم والتدخل وفق نتائج القراءة`;
+        `مرحبًا ${profile.display_name || profile.email}`;
     document.querySelector('#account-name').value = profile.display_name || '';
     document.querySelector('#account-username').value = profile.email;
     document.querySelector('#account-email').value = profile.email;
@@ -316,17 +319,50 @@ document.querySelector('#logout').addEventListener('click', async () => {
 document.querySelector('#student-search').addEventListener('input', renderReports);
 document.querySelector('#grade-filter').addEventListener('change', renderReports);
 document.querySelector('#student-report-list').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-report]');
-    const report = reports.find((item) => item.id === button?.dataset.report);
-    if (report) {
-        const steps = processStepsSummary(report.process_steps);
-        alert(`تقرير ${report.student_name}\nالصف: ${report.grade}\nالمحاولات: ${report.attempts}\nالنسبة: ${report.percent}%\nالتقدم: ${report.progress}\nمهارات تحتاج مراجعة: ${report.weak_skills.join('، ') || 'لا توجد'}\n\nخطوات آخر محاولة:\n${steps || 'لا تتوفر تفاصيل الخطوات.'}`);
-    }
+    const button = event.target.closest('[data-preview-report]');
+    const report = reports.find((item) => item.id === button?.dataset.previewReport);
+    if (!report) return;
+
+    const diagnosticPercent = Math.min(100, Math.max(0, Number(report.diagnostic_percent) || 0));
+    const finalPercent = Math.min(100, Math.max(0, Number(report.percent) || 0));
+    const weakSkills = Array.isArray(report.weak_skills) ? report.weak_skills : [];
+    const steps = processStepsSummary(Array.isArray(report.process_steps) ? report.process_steps : []);
+    document.querySelector('#report-preview-content').innerHTML = `
+        <header class="report-preview__identity">
+            <p class="report-preview__eyebrow">منصة طلاقة • تقرير القراءة</p>
+            <h3>${escapeHtml(report.student_name)}</h3>
+            <p>${escapeHtml(report.grade)} <span aria-hidden="true">•</span> تاريخ آخر محاولة: ${escapeHtml(report.date)}</p>
+        </header>
+        <section class="report-preview__metrics" aria-label="ملخص النتيجة">
+            <article><span>عدد المحاولات</span><strong>${Number(report.attempts) || 0}</strong></article>
+            <article><span>النتيجة النهائية</span><strong>${finalPercent}%</strong></article>
+            <article><span>مستوى التقدم</span><strong>${escapeHtml(report.progress)}</strong></article>
+        </section>
+        <section class="report-preview__chart" aria-labelledby="report-chart-title">
+            <h4 id="report-chart-title">مقارنة نتيجة التشخيص والاختبار الشامل</h4>
+            <div class="report-score">
+                <div><span>التشخيص</span><strong>${diagnosticPercent}%</strong></div>
+                <div class="report-score__track" role="img" aria-label="نتيجة التشخيص ${diagnosticPercent}%"><i style="width:${diagnosticPercent}%"></i></div>
+            </div>
+            <div class="report-score">
+                <div><span>الاختبار الشامل</span><strong>${finalPercent}%</strong></div>
+                <div class="report-score__track" role="img" aria-label="نتيجة الاختبار الشامل ${finalPercent}%"><i style="width:${finalPercent}%"></i></div>
+            </div>
+        </section>
+        <section class="report-preview__skills">
+            <h4>مهارات تحتاج إلى تعزيز</h4>
+            <p>${weakSkills.length ? weakSkills.map(escapeHtml).join('، ') : 'لا توجد مهارات مسجلة تحتاج إلى تعزيز.'}</p>
+        </section>
+        <section class="report-preview__steps">
+            <h4>خطوات التعلّم في آخر محاولة</h4>
+            <pre>${escapeHtml(steps || 'لا تتوفر تفاصيل الخطوات.')}</pre>
+        </section>`;
+    document.querySelector('#student-report-dialog').showModal();
 });
 document.querySelector('#student-report-list').addEventListener('click', async (event) => {
     const button = event.target.closest('[data-delete-report]');
     const report = reports.find((item) => item.id === button?.dataset.deleteReport);
-    if (!report || profile.role !== 'owner' || !confirm(`حذف جميع محاولات ${report.student_name} من قاعدة البيانات؟`)) return;
+    if (!report || !confirm(`سيؤدي ذلك إلى حذف جميع نتائج ${report.student_name} في ${report.grade}. هل تريد المتابعة؟`)) return;
     try {
         await backend.deleteStudentAttempts(report.student_name, report.grade);
         const attempts = await backend.loadAttempts();
@@ -352,10 +388,27 @@ document.querySelector('#student-report-list').addEventListener('click', async (
         reports = [...grouped.values()];
         renderReports();
         renderAnalytics();
-        showStatus('حُذفت محاولات الطالب من قاعدة البيانات.');
+        showStatus('حُذفت جميع نتائج الطالب/ة من قاعدة البيانات.');
     } catch (error) {
         showStatus(`تعذر حذف النتائج: ${error.message}`, true);
     }
+});
+
+document.querySelectorAll('[data-close-report]').forEach((button) => {
+    button.addEventListener('click', () => document.querySelector('#student-report-dialog').close());
+});
+document.querySelector('#print-student-report').addEventListener('click', () => {
+    const printRoot = document.querySelector('#student-report-print-root');
+    printRoot.replaceChildren(document.querySelector('#report-preview-content').cloneNode(true));
+    printRoot.hidden = false;
+    document.body.classList.add('printing-student-report');
+    window.print();
+});
+window.addEventListener('afterprint', () => {
+    document.body.classList.remove('printing-student-report');
+    const printRoot = document.querySelector('#student-report-print-root');
+    printRoot.hidden = true;
+    printRoot.replaceChildren();
 });
 
 document.querySelector('#platform-settings').addEventListener('submit', async (event) => {
@@ -488,15 +541,16 @@ document.querySelector('#teacher-editor').addEventListener('submit', async (even
     const permissions = [...document.querySelectorAll('input[name="permission"]:checked')]
         .map((field) => field.value);
     try {
-        await backend.inviteTeacher({
+        const invitation = await backend.inviteTeacher({
             email: document.querySelector('#teacher-email').value.trim(),
             displayName: document.querySelector('#teacher-name').value.trim(),
-            permissions
+            permissions,
+            redirectTo: new URL('create-password.html', window.location.href).toString()
         });
         teachers = await backend.loadTeachers();
         renderTeachers();
         event.target.reset();
-        showStatus('أُرسلت دعوة المعلم إلى بريده الإلكتروني.');
+        showStatus(`أُرسلت دعوة المعلم إلى بريده الإلكتروني. سيُنشئ كلمة مروره عبر صفحة القبول: ${invitation.redirectTo}`);
     } catch (error) {
         showStatus(`تعذر دعوة المعلم: ${error.message}`, true);
     }

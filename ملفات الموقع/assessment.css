@@ -192,9 +192,34 @@
 .action-button { border: 1px solid #bdc2b2; background: #fff; }
 
 @media print {
-    body { background: #fff; }
+    @page { size: A4 portrait; margin: 14mm; }
+    body {
+        background: #fff !important;
+        color: #1f3428 !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
     .site-header, body::before, .assessment-actions, .action-row, .secondary-button { display: none !important; }
     .assessment-shell { width: 100%; margin: 0; }
+    .results-card,
+    .chart-panel,
+    .skill-result,
+    .lesson-block,
+    .error-item {
+        break-inside: avoid;
+        box-shadow: none !important;
+    }
+    .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-panel { min-height: 270px; }
+    .chart-bars { height: 210px; }
+    .bar-track,
+    .report-score__track { background: #e8eee9 !important; }
+    .bar-track div,
+    .chart-column .bar,
+    .report-score__track i {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
 }
 
 @media (max-width: 700px) {

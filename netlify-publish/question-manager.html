@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#176b45">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <link rel="icon" href="talala-logo.svg" type="image/svg+xml">
+    <title>لوحة المعلم/ة | منصة طلاقة</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="assessment.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="teacher-dashboard.css">
+    <link rel="stylesheet" href="teacher-dashboard-polish.css">
+</head>
+<body>
+    <main class="dashboard-shell">
+        <header class="dashboard-top">
+            <div><h1>لوحة المعلم/ة</h1><p id="dashboard-account">لوحة المعلم/ة</p></div>
+            <div class="dashboard-actions"><a class="secondary-button dashboard-home" href="index.html">واجهة الطالب/ة</a><button type="button" class="secondary-button" id="logout">تسجيل الخروج</button></div>
+        </header>
+
+        <nav class="dashboard-tabs" aria-label="نوافذ لوحة المعلم/ة">
+            <button type="button" class="dashboard-tab active" data-panel="reports" aria-controls="panel-reports" aria-pressed="true">تقارير الطلاب والطالبات</button>
+            <button type="button" class="dashboard-tab" data-panel="analytics" aria-controls="panel-analytics" aria-pressed="false">تحليلات المدرسة ككل</button>
+            <button type="button" class="dashboard-tab" data-panel="questions" aria-controls="panel-questions" aria-pressed="false">بنك الأسئلة</button>
+            <button type="button" class="dashboard-tab" data-panel="interventions" aria-controls="panel-interventions" aria-pressed="false">التدخل والشرح</button>
+            <button type="button" class="dashboard-tab" data-panel="support" aria-controls="panel-support" aria-pressed="false">الدعم والمساندة</button>
+            <button type="button" class="dashboard-tab" data-panel="permissions" aria-controls="panel-permissions" aria-pressed="false">صلاحيات المعلمين والمعلمات</button>
+            <button type="button" class="dashboard-tab" data-panel="settings" aria-controls="panel-settings" aria-pressed="false">الإعدادات</button>
+            <button type="button" class="dashboard-tab" data-panel="account" aria-controls="panel-account" aria-pressed="false">الحساب</button>
+        </nav>
+
+        <section class="dashboard-panel active" id="panel-reports">
+            <div class="panel-heading"><h2>تقارير الطلاب والطالبات</h2></div>
+            <div class="toolbar"><input id="student-search" type="search" aria-label="البحث باسم الطالب/ة" placeholder="ابحث باسم الطالب/ة"><select id="grade-filter" aria-label="تصفية حسب الصف"><option value="">جميع الصفوف</option></select><strong id="tested-count" aria-live="polite">لا توجد نتائج بعد</strong></div>
+            <div class="data-table-wrap" tabindex="0" role="region" aria-label="جدول نتائج الطلاب والطالبات"><table class="data-table"><thead><tr><th>اسم الطالب/ة</th><th>الصف</th><th>المحاولات</th><th>النسبة</th><th>التقدم</th><th>التاريخ</th><th>التقرير</th></tr></thead><tbody id="student-report-list"></tbody></table></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-analytics">
+            <div class="panel-heading"><h2>تحليلات المدرسة</h2></div>
+            <div class="metric-grid" id="analytics-metrics"></div>
+            <div class="chart-grid"><article class="chart-card"><h3>تحسن مستوى الإتقان</h3><div class="bar-chart" id="progress-chart"></div></article><article class="chart-card"><h3>المهارات الأكثر خطأً</h3><div class="bar-chart" id="skills-chart"></div></article></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-questions">
+            <div class="panel-heading"><h2>بنك الأسئلة</h2></div>
+            <div class="toolbar"><input id="question-search" type="search" aria-label="البحث عن سؤال" placeholder="البحث عن سؤال"><select id="question-stage" aria-label="مرحلة السؤال"><option value="diagnostic">التشخيصي</option><option value="intervention">التدخل</option><option value="final">الشامل</option></select><button type="button" class="primary-button" id="add-question">إضافة سؤال</button></div>
+            <form id="question-editor" class="editor-card admin-editor field-grid">
+                <textarea id="question-text" aria-label="نص السؤال" placeholder="نص السؤال" required></textarea>
+                <input id="choice-0" aria-label="الخيار الأول" placeholder="الخيار الأول" required><input id="choice-1" aria-label="الخيار الثاني" placeholder="الخيار الثاني" required>
+                <input id="choice-2" aria-label="الخيار الثالث" placeholder="الخيار الثالث" required><input id="choice-3" aria-label="الخيار الرابع" placeholder="الخيار الرابع" required>
+                <select id="question-skill" aria-label="مهارة السؤال"></select><select id="question-difficulty" aria-label="مستوى الصعوبة"><option value="1">سهل</option><option value="2">متوسط</option><option value="3">صعب</option></select>
+                <input id="answer-index" type="number" min="0" max="3" aria-label="رقم الإجابة الصحيحة، من 0 إلى 3" placeholder="رقم الإجابة الصحيحة (0–3)" required>
+                <input id="question-explanation" aria-label="شرح التصحيح" placeholder="شرح التصحيح" required>
+                <input id="question-passage" aria-label="نص القراءة الاختياري" placeholder="نص قراءة اختياري">
+                <button type="submit" class="primary-button">حفظ السؤال</button>
+                <button type="button" class="secondary-button" id="cancel-question">إلغاء</button>
+            </form>
+            <div id="question-list" class="data-list"></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-interventions">
+            <div class="panel-heading"><h2>التدخل والشرح</h2></div>
+            <div id="intervention-list" class="data-list"></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-support">
+            <div class="panel-heading"><h2>الدعم والمساندة</h2></div>
+            <div id="support-tickets" class="data-list"></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-permissions">
+            <div class="panel-heading"><h2>صلاحيات المعلمين والمعلمات</h2></div>
+            <form id="teacher-editor" class="editor-card admin-editor field-grid open">
+                <input id="teacher-name" placeholder="اسم المعلم/ة" required>
+                <input id="teacher-email" type="email" placeholder="البريد الإلكتروني" required>
+                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة ليُنشئ كلمة مروره بنفسه. الصلاحيات المحددة أدناه تُربط بحسابه وتبقى محفوظة عند تغيير كلمة المرور.</p>
+                <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label></div>
+                <button type="submit" class="primary-button">إضافة المعلم/ة</button>
+            </form>
+            <div id="teacher-list" class="data-list"></div>
+        </section>
+
+        <section class="dashboard-panel" id="panel-settings">
+            <div class="panel-heading"><h2>إعدادات المنصة</h2></div>
+            <form id="platform-settings" class="editor-card admin-editor field-grid open">
+                <input id="platform-name" value="منصة طلاقة" placeholder="اسم المنصة" required>
+                <input id="school-name" placeholder="اسم المدرسة أو المؤسسة">
+                <select id="report-format"><option value="pdf">تقرير PDF</option><option value="print">طباعة مباشرة</option></select>
+                <select id="language-setting"><option value="ar">العربية</option></select>
+                <label><input id="show-student-details" type="checkbox" checked> إظهار بيانات الطلاب والطالبات في تقارير المعلم/ة</label>
+                <label><input id="allow-support" type="checkbox" checked> تفعيل نموذج الدعم والمساندة</label>
+                <button type="submit" class="primary-button">حفظ الإعدادات</button>
+            </form>
+        </section>
+
+        <section class="dashboard-panel" id="panel-account">
+            <div class="panel-heading"><h2>حسابي</h2></div>
+            <form id="account-editor" class="editor-card admin-editor field-grid open">
+                <input id="account-name" placeholder="الاسم الظاهر" required>
+                <input id="account-username" value="HANAA" placeholder="اسم المستخدم" readonly>
+                <input id="account-email" type="email" placeholder="بريد تسجيل الدخول" readonly>
+                <button type="submit" class="primary-button">حفظ الاسم الظاهر</button>
+            </form>
+            <p id="account-message" role="status"></p>
+        </section>
+    </main>
+
+    <dialog id="student-report-dialog" class="report-dialog" aria-labelledby="student-report-title">
+        <div class="report-dialog__header">
+            <h2 id="student-report-title">معاينة تقرير الطالب/ة</h2>
+            <button type="button" class="secondary-button" data-close-report aria-label="إغلاق المعاينة">إغلاق</button>
+        </div>
+        <div id="report-preview-content" class="report-preview"></div>
+        <div class="report-dialog__actions">
+            <button type="button" class="primary-button" id="print-student-report">طباعة التقرير أو حفظه PDF</button>
+            <button type="button" class="secondary-button" data-close-report>إغلاق</button>
+        </div>
+    </dialog>
+    <div id="student-report-print-root" hidden aria-hidden="true"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+    <script src="supabase/config.js"></script>
+    <script src="supabase/client.js"></script>
+    <script src="assessment-data.js"></script>
+    <script src="teacher-dashboard-cloud.js"></script>
+</body>
+</html>

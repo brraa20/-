@@ -67,7 +67,7 @@ Deno.serve(async (request) => {
     return response({ error: "Only the active platform owner can invite teachers." }, 403);
   }
 
-  let input: { email?: string; displayName?: string; permissions?: string[] };
+  let input: { email?: string; displayName?: string; permissions?: string[]; redirectTo?: string };
   try {
     input = await request.json();
   } catch {
@@ -89,22 +89,56 @@ Deno.serve(async (request) => {
     return response({ error: "Teacher details or permissions are invalid." }, 400);
   }
 
+  const requestOrigin = request.headers.get("Origin");
+  let redirectTo: string;
+  try {
+    const origin = new URL(requestOrigin ?? "");
+    const isLocalDevelopment = origin.protocol === "http:"
+      && ["localhost", "127.0.0.1"].includes(origin.hostname);
+    if (origin.protocol !== "https:" && !isLocalDevelopment) {
+      return response({ error: "Teacher invitation requires a secure site origin." }, 400);
+    }
+    const invitationUrl = new URL(input.redirectTo ?? "");
+    if (
+      invitationUrl.origin !== origin.origin ||
+      !invitationUrl.pathname.endsWith("/create-password.html") ||
+      invitationUrl.search ||
+      invitationUrl.hash
+    ) {
+      return response({ error: "The teacher invitation redirect URL is invalid." }, 400);
+    }
+    redirectTo = invitationUrl.toString();
+  } catch {
+    return response({ error: "Could not determine the teacher invitation redirect URL." }, 400);
+  }
+
   const { data: invitation, error: inviteError } = await adminClient.auth.admin
-    .inviteUserByEmail(email, { data: { display_name: displayName } });
+    .inviteUserByEmail(email, {
+      data: { display_name: displayName },
+      redirectTo,
+    });
   if (inviteError || !invitation.user) {
     console.error("Could not invite the teacher.", inviteError);
     return response({ error: inviteError?.message ?? "Teacher invitation failed." }, 400);
   }
 
-  const { error: updateError } = await adminClient
+  const { data: teacherProfile, error: updateError } = await adminClient
     .from("profiles")
-    .update({ display_name: displayName, role: "teacher", active: true, permissions })
-    .eq("id", invitation.user.id);
-  if (updateError) {
+    .upsert({
+      id: invitation.user.id,
+      email,
+      display_name: displayName,
+      role: "teacher",
+      active: true,
+      permissions,
+    }, { onConflict: "id" })
+    .select("id, permissions")
+    .single();
+  if (updateError || !teacherProfile) {
     console.error("Could not assign teacher permissions.", updateError);
     await adminClient.auth.admin.deleteUser(invitation.user.id);
     return response({ error: "The invitation could not be assigned teacher permissions." }, 500);
   }
 
-  return response({ invited: true });
+  return response({ invited: true, redirectTo });
 });

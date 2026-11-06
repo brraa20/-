@@ -196,9 +196,10 @@ create policy "Authorized teachers read assessment results"
     using (public.has_teacher_permission('reports'));
 
 drop policy if exists "Owners delete assessment results" on public.assessment_attempts;
-create policy "Owners delete assessment results"
+drop policy if exists "Authorized teachers delete assessment results" on public.assessment_attempts;
+create policy "Authorized teachers delete assessment results"
     on public.assessment_attempts for delete to authenticated
-    using (public.is_platform_owner());
+    using (public.has_teacher_permission('reports'));
 
 drop policy if exists "Authorized support staff read tickets" on public.support_tickets;
 create policy "Authorized support staff read tickets"

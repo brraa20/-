@@ -11,11 +11,12 @@
     <link rel="stylesheet" href="ملفات الموقع/assessment.css">
     <link rel="stylesheet" href="ملفات الموقع/theme.css">
     <link rel="stylesheet" href="ملفات الموقع/teacher-dashboard.css">
+    <link rel="stylesheet" href="ملفات الموقع/teacher-dashboard-polish.css">
 </head>
 <body>
     <main class="dashboard-shell">
         <header class="dashboard-top">
-            <div><h1>لوحة المعلم/ة</h1><p id="dashboard-account">إدارة التعلم والتدخل وفق نتائج القراء</p></div>
+            <div><h1>لوحة المعلم/ة</h1><p id="dashboard-account">لوحة المعلم/ة</p></div>
             <div class="dashboard-actions"><a class="secondary-button dashboard-home" href="index.html">واجهة الطالب/ة</a><button type="button" class="secondary-button" id="logout">تسجيل الخروج</button></div>
         </header>
 
@@ -32,12 +33,12 @@
 
         <section class="dashboard-panel active" id="panel-reports">
             <div class="panel-heading"><h2>تقارير الطلاب والطالبات</h2></div>
-            <div class="toolbar"><input id="student-search" type="search" aria-label="البحث باسم الطالب/ة" placeholder="ابحث باسم الطالب/ة"><select id="grade-filter" aria-label="تصفية حسب الصف"><option value="">جميع الصفوف</option></select><strong id="tested-count" aria-live="polite">0 طالبًا/طالبة</strong></div>
+            <div class="toolbar"><input id="student-search" type="search" aria-label="البحث باسم الطالب/ة" placeholder="ابحث باسم الطالب/ة"><select id="grade-filter" aria-label="تصفية حسب الصف"><option value="">جميع الصفوف</option></select><strong id="tested-count" aria-live="polite">لا توجد نتائج بعد</strong></div>
             <div class="data-table-wrap" tabindex="0" role="region" aria-label="جدول نتائج الطلاب والطالبات"><table class="data-table"><thead><tr><th>اسم الطالب/ة</th><th>الصف</th><th>المحاولات</th><th>النسبة</th><th>التقدم</th><th>التاريخ</th><th>التقرير</th></tr></thead><tbody id="student-report-list"></tbody></table></div>
         </section>
 
         <section class="dashboard-panel" id="panel-analytics">
-            <div class="panel-heading"><h2>تحليلات المدرسة ككل</h2></div>
+            <div class="panel-heading"><h2>تحليلات المدرسة</h2></div>
             <div class="metric-grid" id="analytics-metrics"></div>
             <div class="chart-grid"><article class="chart-card"><h3>تحسن مستوى الإتقان</h3><div class="bar-chart" id="progress-chart"></div></article><article class="chart-card"><h3>المهارات الأكثر خطأً</h3><div class="bar-chart" id="skills-chart"></div></article></div>
         </section>
@@ -74,7 +75,7 @@
             <form id="teacher-editor" class="editor-card admin-editor field-grid open">
                 <input id="teacher-name" placeholder="اسم المعلم/ة" required>
                 <input id="teacher-email" type="email" placeholder="البريد الإلكتروني" required>
-                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة ليُنشئ كلمة مروره بنفسه.</p>
+                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة ليُنشئ كلمة مروره بنفسه. الصلاحيات المحددة أدناه تُربط بحسابه وتبقى محفوظة عند تغيير كلمة المرور.</p>
                 <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label></div>
                 <button type="submit" class="primary-button">إضافة المعلم/ة</button>
             </form>
@@ -105,6 +106,19 @@
             <p id="account-message" role="status"></p>
         </section>
     </main>
+
+    <dialog id="student-report-dialog" class="report-dialog" aria-labelledby="student-report-title">
+        <div class="report-dialog__header">
+            <h2 id="student-report-title">معاينة تقرير الطالب/ة</h2>
+            <button type="button" class="secondary-button" data-close-report aria-label="إغلاق المعاينة">إغلاق</button>
+        </div>
+        <div id="report-preview-content" class="report-preview"></div>
+        <div class="report-dialog__actions">
+            <button type="button" class="primary-button" id="print-student-report">طباعة التقرير أو حفظه PDF</button>
+            <button type="button" class="secondary-button" data-close-report>إغلاق</button>
+        </div>
+    </dialog>
+    <div id="student-report-print-root" hidden aria-hidden="true"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
     <script src="supabase/config.js"></script>

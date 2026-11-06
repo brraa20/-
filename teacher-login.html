@@ -18,7 +18,7 @@
             <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">بوابة المعلم/ة</span></span>
         </a>
         <nav aria-label="التنقل الرئيسي">
-            <ul><li><a href="index.html">الرئيسية</a></li><li><a href="support.html">الدعم</a></li></ul>
+            <ul><li><a href="index.html">الرئيسية</a></li></ul>
         </nav>
     </header>
     <main class="login-shell">
@@ -72,21 +72,30 @@
             }
         });
 
-        document.querySelector('#forgot-password').addEventListener('click', async () => {
+        const forgotPasswordButton = document.querySelector('#forgot-password');
+        forgotPasswordButton.addEventListener('click', async () => {
             error.textContent = '';
             if (!username.value.trim()) {
                 error.textContent = 'أدخل بريدك الإلكتروني أولًا.';
                 return;
             }
+
+            forgotPasswordButton.disabled = true;
             try {
                 const supabase = window.TalalaBackend.requireClient();
+                const redirectTo = new URL('update-password.html', window.location.href).toString();
                 const { error: resetError } = await supabase.auth.resetPasswordForEmail(username.value.trim(), {
-                    redirectTo: `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}teacher-login.html`
+                    redirectTo
                 });
                 if (resetError) throw resetError;
                 error.textContent = 'إذا كان البريد مسجلًا، ستصلك رسالة لإعادة تعيين كلمة المرور.';
             } catch (resetError) {
-                error.textContent = resetError.message || 'تعذر إرسال رسالة إعادة التعيين.';
+                const message = resetError.message || 'تعذر إرسال رسالة إعادة التعيين.';
+                error.textContent = /redirect|url not allowed/i.test(message)
+                    ? `رفض Supabase عنوان التحويل. أضف هذا العنوان إلى قائمة Redirect URLs المسموح بها: ${new URL('update-password.html', window.location.href).toString()}`
+                    : `${message} إذا لم يفتح الرابط، تأكد من إضافة عنوان update-password.html إلى Redirect URLs في Supabase.`;
+            } finally {
+                forgotPasswordButton.disabled = false;
             }
         });
     </script>

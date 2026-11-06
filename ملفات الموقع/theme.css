@@ -1053,3 +1053,122 @@ button,
     .dashboard-tab { font-size: 0.7rem; }
     .metric-grid { grid-template-columns: 1fr; }
 }
+
+/* توحيد نهائي للألوان والمسافات والإطارات عبر صفحات المنصة. */
+:root {
+    --card-radius: 14px;
+    --control-radius: 9px;
+}
+
+body {
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.8;
+}
+
+h1,
+h2,
+h3 {
+    color: var(--green-dark);
+    line-height: 1.5;
+}
+
+.diagnosis-card,
+.login-card,
+.support-card,
+.question-card,
+.intervention-card,
+.results-card,
+.progress-panel,
+.chart-card,
+.data-card,
+.metric-card,
+.editor-card,
+.manager-question,
+.question-editor,
+#support-inbox {
+    border: 1px solid var(--line) !important;
+    border-radius: var(--card-radius) !important;
+    background: var(--paper) !important;
+    box-shadow: 0 10px 30px rgba(31, 52, 40, 0.07) !important;
+}
+
+.diagnosis-form input[type='text'],
+.login-card input,
+.support-form input,
+.support-form textarea,
+.track-row input,
+.field-grid input,
+.field-grid textarea,
+.field-grid select,
+.admin-editor input,
+.admin-editor textarea,
+.admin-editor select,
+.toolbar input,
+.toolbar select,
+.status-select,
+.reply-area {
+    border: 1px solid #cbd6ce !important;
+    border-radius: var(--control-radius) !important;
+    background: #fff !important;
+    color: var(--ink);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--green) !important;
+    outline: 3px solid rgba(23, 107, 69, 0.14) !important;
+}
+
+.local-storage-note,
+.brand-badge,
+.platform-benefits span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.8;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.action-button,
+.send-button,
+.assessment-actions button,
+.dashboard-tab,
+.grade-grid label,
+.type-grid label,
+.answer-option {
+    min-height: 44px;
+    border-radius: var(--control-radius) !important;
+    font-family: var(--font-academic);
+    line-height: 1.55;
+}
+
+.primary-button,
+.send-button,
+.assessment-actions .primary-button {
+    background: var(--green) !important;
+    color: #fff !important;
+}
+
+.secondary-button,
+.action-button {
+    border: 1px solid #cbd6ce !important;
+    background: #fff !important;
+    color: var(--green-dark) !important;
+}
+
+.danger-button {
+    border: 1px solid #d6aaa6 !important;
+    background: #fff8f7 !important;
+    color: #8d2d28 !important;
+}
+
+.grade-option:checked + label,
+.request-type:checked + label,
+.answer-option.selected {
+    border-color: var(--green) !important;
+    background: var(--green-soft) !important;
+    color: var(--green-dark) !important;
+}
