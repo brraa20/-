@@ -31,3 +31,5 @@ The invitation function uses Supabase-provided environment values and the projec
 The database migration adds invitation acceptance tracking and the `accept_teacher_invitation()` RPC. Teachers receive access only after accepting their Supabase email invitation and setting a password.
 
 The `reports` and `analytics` permissions are independent. `reports` grants access to detailed student reports; `analytics` grants access only to aggregate school analytics.
+
+To grant the platform owner account full access, first create `brraa.20@gmail.com` under Supabase Authentication, then run `owner-setup.sql` in the SQL Editor. The script creates or repairs the matching `profiles` row and reports the resulting role and permissions.
