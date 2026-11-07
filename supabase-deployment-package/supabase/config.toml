@@ -1,0 +1,4 @@
+project_id = "talala-reading-platform"
+
+[functions.create-teacher]
+verify_jwt = true

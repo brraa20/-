@@ -6,36 +6,18 @@
 
 1. افتح مشروع Supabase ثم **SQL Editor → New query**.
 2. انسخ محتوى `schema.sql` كاملًا ونفّذه.
-3. عند تحديث مشروع موجود، نفّذ كذلك ملف `migrations/20261107_teacher_invitation_acceptance.sql`. تُعتمد الدعوات القديمة التي أكد أصحابها بريدهم، مع بقاء أي حساب أوقفه المالك غير نشط.
+3. عند تحديث مشروع موجود سبق إعداد مخططه، نفّذ ملفات `migrations/20261107000000_teacher_invitation_acceptance.sql` و`migrations/20261107120000_teacher_analytics_summary.sql` من SQL Editor.
 4. من **Authentication → Providers → Email** فعّل البريد الإلكتروني. يلزم إعداد SMTP موثوق إذا أردت وصول دعوات المعلمين إلى بريدهم.
 5. من **Authentication → URL Configuration** أضف عنوان الموقع المنشور إلى Site URL وRedirect URLs؛ مثل `https://OWNER.github.io/REPOSITORY/`.
 
-الجداول مفعّل عليها RLS. لا يحصل حساب المعلم على صلاحيات الدخول حتى يفتح رابط دعوة Supabase الوارد إلى بريده، ينشئ كلمة المرور، وتؤكد قاعدة البيانات قبول الدعوة. تفعيل الحساب من لوحة المالك وحده لا يتجاوز قبول الدعوة. تقارير الطلاب لا يقرؤها إلا المعلم النشط المقبول صاحب صلاحية `reports`، ولا تظهر تذاكر الدعم إلا لحساب يملك صلاحية `support`.
+الجداول مفعّل عليها RLS. لا يحصل حساب المعلم على صلاحيات الدخول حتى يفتح رابط دعوة Supabase الوارد إلى بريده، ينشئ كلمة المرور، وتؤكد قاعدة البيانات قبول الدعوة. تفعيل الحساب من لوحة المالك وحده لا يتجاوز قبول الدعوة. صلاحيتا `reports` و`analytics` مستقلتان؛ يمكن منح أي منهما دون الأخرى. صلاحية `reports` تتيح تقارير الطلاب التفصيلية، بينما تعرض صلاحية `analytics` ملخصًا مجمعًا عبر دالة قاعدة البيانات دون كشف سجلات الطلاب أو أسمائهم. ولا تظهر تذاكر الدعم إلا لحساب يملك صلاحية `support`.
 
 ## 2. إنشاء حساب المالك
 
-1. من **Authentication → Users → Add user** أنشئ حساب بريد المالك وكلمة مروره.
-2. انسخ UUID للحساب.
-3. نفّذ الاستعلام التالي في SQL Editor مع استبدال UUID:
-
-```sql
-update public.profiles
-set role = 'owner',
-    active = true,
-    display_name = 'مالك المنصة',
-    permissions = array['reports', 'analytics', 'questions', 'interventions', 'support']
-where id = 'ضع-UUID-حساب-المالك-هنا';
-```
+1. من **Authentication → Users → Add user** أنشئ حسابًا بالبريد `brraa.20@gmail.com` وكلمة المرور التي تختارها.
+2. بعد إنشاء المستخدم، افتح **SQL Editor → New query** وشغّل محتوى `owner-setup.sql`. يعيّن الملف هذا الحساب مالكًا نشطًا ويعرض نتيجة التحقق.
 
 لا يمكن لمالك المنصة تحديد دوره من صفحة الموقع؛ الدور لا يعيّنه إلا مسؤول المشروع في Supabase.
-
-تحقق من تعيين الحساب:
-
-```sql
-select id, email, role, active, permissions
-from public.profiles
-where id = 'ضع-UUID-حساب-المالك-هنا';
-```
 
 ## 3. نشر وظيفة دعوة المعلمين
 

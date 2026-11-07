@@ -77,7 +77,7 @@
                     || !Array.isArray(profile.permissions)
                     || (profile.role === 'teacher' && !profile.invitation_accepted)
                     || (profile.role === 'teacher'
-                        && !['reports', 'questions', 'interventions', 'support']
+                        && !['reports', 'analytics', 'questions', 'interventions', 'support']
                             .some((permission) => profile.permissions.includes(permission)))
                 ) {
                     const { error: signOutError } = await supabase.auth.signOut();

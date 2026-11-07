@@ -86,7 +86,7 @@ Deno.serve(async (request) => {
     !Array.isArray(permissions) ||
     permissions.some((permission) => !allowedPermissions.has(permission)) ||
     !permissions.some((permission) =>
-      ["reports", "questions", "interventions", "support"].includes(permission)
+      ["reports", "analytics", "questions", "interventions", "support"].includes(permission)
     )
   ) {
     return response({ error: "Teacher details or permissions are invalid." }, 400);

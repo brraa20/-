@@ -68,9 +68,6 @@ function setPanel(panelName) {
 
 function can(permission) {
     if (profile.role === 'owner') return true;
-    if (permission === 'analytics') {
-        return profile.permissions.includes('analytics') && profile.permissions.includes('reports');
-    }
     return profile.permissions.includes(permission);
 }
 
@@ -109,28 +106,36 @@ function renderReports() {
         : '<tr><td colspan="7" class="empty-state">لا توجد نتائج مطابقة.</td></tr>';
 }
 
-function renderAnalytics() {
-    const average = reports.length
+function renderAnalytics(summary = null) {
+    const studentCount = summary?.student_count ?? reports.length;
+    const average = summary?.average_percent ?? (reports.length
         ? Math.round(reports.reduce((sum, report) => sum + report.percent, 0) / reports.length)
-        : 0;
-    const diagnosticAverage = reports.length
+        : 0);
+    const diagnosticAverage = summary?.diagnostic_average ?? (reports.length
         ? Math.round(reports.reduce((sum, report) => sum + report.diagnostic_percent, 0) / reports.length)
-        : 0;
-    const highest = reports.length ? Math.max(...reports.map((report) => report.percent)) : 0;
+        : 0);
+    const highest = summary?.highest_percent ?? (reports.length ? Math.max(...reports.map((report) => report.percent)) : 0);
+    const totalAttempts = summary?.total_attempts
+        ?? reports.reduce((sum, report) => sum + report.attempts, 0);
     document.querySelector('#analytics-metrics').innerHTML = `
-        <article class="metric-card"><strong>${reports.length}</strong><span>عدد المختبرين</span></article>
+        <article class="metric-card"><strong>${studentCount}</strong><span>عدد المختبرين</span></article>
         <article class="metric-card"><strong>${average}%</strong><span>المتوسط العام</span></article>
         <article class="metric-card"><strong>${highest}%</strong><span>أعلى مستوى إتقان</span></article>
-        <article class="metric-card"><strong>${reports.reduce((sum, report) => sum + report.attempts, 0)}</strong><span>إجمالي المحاولات</span></article>`;
-    document.querySelector('#progress-chart').innerHTML = reports.length
+        <article class="metric-card"><strong>${totalAttempts}</strong><span>إجمالي المحاولات</span></article>`;
+    document.querySelector('#progress-chart').innerHTML = studentCount
         ? chartMarkup([['التشخيصي', diagnosticAverage], ['الشامل', average]], '%')
         : '<p class="empty-state">ستظهر المقارنة بعد إكمال أول اختبار.</p>';
-    const frequency = {};
-    reports.forEach((report) => report.weak_skills.forEach((skill) => {
-        frequency[skill] = (frequency[skill] || 0) + 1;
-    }));
-    document.querySelector('#skills-chart').innerHTML = Object.keys(frequency).length
-        ? chartMarkup(Object.entries(frequency), ' طالب/ة')
+    const weakSkills = summary?.weak_skills
+        ? summary.weak_skills.map(({ skill, count }) => [skill, count])
+        : (() => {
+            const frequency = {};
+            reports.forEach((report) => report.weak_skills.forEach((skill) => {
+                frequency[skill] = (frequency[skill] || 0) + 1;
+            }));
+            return Object.entries(frequency);
+        })();
+    document.querySelector('#skills-chart').innerHTML = weakSkills.length
+        ? chartMarkup(weakSkills, ' طالب/ة')
         : '<p class="empty-state">لا توجد مهارات تحتاج إلى دعم مسجلة بعد.</p>';
 }
 
@@ -256,7 +261,7 @@ async function initialize() {
         || !Array.isArray(profile.permissions)
         || (profile.role === 'teacher' && !profile.invitation_accepted)
         || (profile.role === 'teacher'
-            && !['reports', 'questions', 'interventions', 'support']
+            && !['reports', 'analytics', 'questions', 'interventions', 'support']
                 .some((permission) => profile.permissions.includes(permission)))
     ) {
         const { error: signOutError } = await backend.requireClient().auth.signOut();
@@ -323,8 +328,10 @@ async function initialize() {
         const grades = [...new Set(reports.map((report) => report.grade))];
         const gradeFilter = document.querySelector('#grade-filter');
         grades.forEach((grade) => gradeFilter.add(new Option(grade, grade)));
-        if (can('reports')) renderReports();
+        renderReports();
         if (can('analytics')) renderAnalytics();
+    } else if (can('analytics')) {
+        renderAnalytics(await backend.loadAnalyticsSummary());
     }
 
     if (can('support')) {

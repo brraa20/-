@@ -69,6 +69,11 @@
                 .limit(5000));
         },
 
+        async loadAnalyticsSummary() {
+            const supabase = this.requireClient();
+            return await check(supabase.rpc('get_teacher_analytics_summary'));
+        },
+
         async deleteStudentAttempts(studentName, grade) {
             const supabase = this.requireClient();
             await check(supabase.from('assessment_attempts')
