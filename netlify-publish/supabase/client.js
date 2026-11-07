@@ -27,6 +27,10 @@
             if (userError) throw userError;
             if (!userData.user) return null;
 
+            if (userData.user.email?.trim().toLowerCase() === 'brraa.20@gmail.com') {
+                await check(supabase.rpc('ensure_platform_owner_profile'));
+            }
+
             const profile = await check(supabase
                 .from('profiles')
                 .select('id, display_name, role, active, invitation_accepted, permissions')

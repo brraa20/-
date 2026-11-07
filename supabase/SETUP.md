@@ -6,7 +6,7 @@
 
 1. افتح مشروع Supabase ثم **SQL Editor → New query**.
 2. انسخ محتوى `schema.sql` كاملًا ونفّذه.
-3. عند تحديث مشروع موجود سبق إعداد مخططه، نفّذ ملفات `migrations/20261107000000_teacher_invitation_acceptance.sql` و`migrations/20261107120000_teacher_analytics_summary.sql` من SQL Editor.
+3. عند تحديث مشروع موجود سبق إعداد مخططه، نفّذ ملفات الترحيل الجديدة بترتيبها الزمني، بما فيها `migrations/20261107130000_ensure_platform_owner_profile.sql`، من SQL Editor.
 4. من **Authentication → Providers → Email** فعّل البريد الإلكتروني. يلزم إعداد SMTP موثوق إذا أردت وصول دعوات المعلمين إلى بريدهم.
 5. من **Authentication → URL Configuration** أضف عنوان الموقع المنشور إلى Site URL وRedirect URLs؛ مثل `https://OWNER.github.io/REPOSITORY/`.
 
@@ -15,7 +15,8 @@
 ## 2. إنشاء حساب المالك
 
 1. من **Authentication → Users → Add user** أنشئ حسابًا بالبريد `brraa.20@gmail.com` وكلمة المرور التي تختارها.
-2. بعد إنشاء المستخدم، افتح **SQL Editor → New query** وشغّل محتوى `owner-setup.sql`. ينشئ الملف أو يحدّث سجل `profiles` مباشرة من مستخدم Supabase Auth، ويعيّن هذا الحساب مالكًا نشطًا بكامل الصلاحيات ثم يعرض نتيجة التحقق. إذا كان تسجيل الدخول يعرض رسالة عدم النشاط أو الصلاحية، شغّل هذا الملف مجددًا وتأكد أن نتيجة التحقق تعرض `role = owner` و`active = true`.
+2. بعد إنشاء المستخدم، افتح **SQL Editor → New query** وشغّل محتوى `owner-setup.sql`. ينشئ الملف أو يحدّث سجل `profiles` مباشرة من مستخدم Supabase Auth، ويعيّن هذا الحساب مالكًا نشطًا بكامل الصلاحيات ثم يعرض نتيجة التحقق.
+3. في المشاريع القائمة، نفّذ ترحيل `20261107130000_ensure_platform_owner_profile.sql` أيضًا. بعد نشره، تعيد الواجهة إنشاء سجل المالك تلقائيًا إذا كان مفقودًا، بعد التحقق من أن جلسة Supabase تخص `brraa.20@gmail.com`. تأكد أن إعداد الموقع يشير إلى المشروع نفسه الذي طُبّق عليه الترحيل.
 
 لا يمكن لمالك المنصة تحديد دوره من صفحة الموقع؛ الدور لا يعيّنه إلا مسؤول المشروع في Supabase.
 
