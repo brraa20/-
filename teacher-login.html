@@ -51,24 +51,46 @@
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
+            error.textContent = '';
+            submitButton.disabled = true;
             try {
                 const supabase = window.TalalaBackend.requireClient();
-                const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                const { error: signInError } = await supabase.auth.signInWithPassword({
                     email: username.value.trim(),
                     password: password.value
                 });
                 if (signInError) throw signInError;
 
-                const profile = await window.TalalaBackend.getProfile();
-                if (!profile || !profile.active) {
-                    await supabase.auth.signOut();
-                    throw new Error('لم يُفعّل هذا الحساب بعد. تواصل مع مالك المنصة.');
+                let profile;
+                try {
+                    profile = await window.TalalaBackend.getProfile();
+                } catch (profileError) {
+                    const { error: signOutError } = await supabase.auth.signOut();
+                    if (signOutError) console.error('Unable to clear an unverified login session.', signOutError);
+                    throw profileError;
                 }
-                window.location.href = 'question-manager.html';
+
+                if (
+                    !profile
+                    || !profile.active
+                    || !['owner', 'teacher'].includes(profile.role)
+                    || !Array.isArray(profile.permissions)
+                    || (profile.role === 'teacher' && !profile.invitation_accepted)
+                    || (profile.role === 'teacher'
+                        && !['reports', 'questions', 'interventions', 'support']
+                            .some((permission) => profile.permissions.includes(permission)))
+                ) {
+                    const { error: signOutError } = await supabase.auth.signOut();
+                    if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
+                    throw new Error('هذا الحساب غير نشط أو لم يقبل دعوة البريد أو لم تُمنح له صلاحية في لوحة المعلم.');
+                }
+                window.location.replace('question-manager.html');
             } catch (signInError) {
                 error.textContent = signInError.message === window.TalalaBackend?.configurationMessage
                     ? signInError.message
                     : signInError.message || 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.';
+            } finally {
+                submitButton.disabled = !window.TalalaBackend.isConfigured;
             }
         });
 

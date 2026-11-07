@@ -75,10 +75,11 @@
             <form id="teacher-editor" class="editor-card admin-editor field-grid open">
                 <input id="teacher-name" placeholder="اسم المعلم/ة" required>
                 <input id="teacher-email" type="email" placeholder="البريد الإلكتروني" required>
-                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة ليُنشئ كلمة مروره بنفسه. الصلاحيات المحددة أدناه تُربط بحسابه وتبقى محفوظة عند تغيير كلمة المرور.</p>
+                <p class="local-storage-note">ستُرسل للمعلم دعوة آمنة من Supabase. لا تُفعّل صلاحيات الحساب إلا بعد فتح رابط الدعوة وقبولها وإنشاء كلمة المرور.</p>
                 <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label></div>
                 <button type="submit" class="primary-button">إضافة المعلم/ة</button>
             </form>
+            <p class="local-storage-note">تظهر هنا بيانات الحسابات وصلاحياتها. لا تُعرض كلمات المرور لأمان الحسابات؛ استخدم زر إرسال رابط إعادة التعيين ليختار المعلم كلمة مرور جديدة بنفسه.</p>
             <div id="teacher-list" class="data-list"></div>
         </section>
 

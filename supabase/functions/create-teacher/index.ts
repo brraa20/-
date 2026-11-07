@@ -84,7 +84,10 @@ Deno.serve(async (request) => {
     !displayName ||
     displayName.length > 120 ||
     !Array.isArray(permissions) ||
-    permissions.some((permission) => !allowedPermissions.has(permission))
+    permissions.some((permission) => !allowedPermissions.has(permission)) ||
+    !permissions.some((permission) =>
+      ["reports", "questions", "interventions", "support"].includes(permission)
+    )
   ) {
     return response({ error: "Teacher details or permissions are invalid." }, 400);
   }
@@ -129,7 +132,8 @@ Deno.serve(async (request) => {
       email,
       display_name: displayName,
       role: "teacher",
-      active: true,
+      active: false,
+      invitation_accepted: false,
       permissions,
     }, { onConflict: "id" })
     .select("id, permissions")

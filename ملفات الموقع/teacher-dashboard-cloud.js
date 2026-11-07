@@ -55,6 +55,7 @@ function processStepsSummary(steps = []) {
 }
 
 function setPanel(panelName) {
+    if (!canAccessPanel(panelName)) return;
     document.querySelectorAll('.dashboard-tab').forEach((button) => {
         const active = button.dataset.panel === panelName;
         button.classList.toggle('active', active);
@@ -71,6 +72,12 @@ function can(permission) {
         return profile.permissions.includes('analytics') && profile.permissions.includes('reports');
     }
     return profile.permissions.includes(permission);
+}
+
+function canAccessPanel(panelName) {
+    const permission = panelPermissions[panelName];
+    if (!permission) return false;
+    return permission === 'owner' ? profile.role === 'owner' : can(permission);
 }
 
 async function loadContentOrDefault(key, fallback) {
@@ -212,11 +219,16 @@ function renderTeachers() {
         .map((teacher) => `<article class="data-card">
             <strong>${escapeHtml(teacher.display_name || 'معلم/ة')}</strong>
             <p>${escapeHtml(teacher.email)}</p>
-            <div class="meta-row"><span class="meta-tag">${teacher.active ? 'نشط' : 'غير نشط'}</span>
+            <div class="meta-row"><span class="meta-tag">${
+                !teacher.invitation_accepted ? 'بانتظار قبول الدعوة'
+                    : teacher.active ? 'نشط' : 'غير نشط'
+            }</span>
             ${teacher.permissions.map((permission) => `<span class="meta-tag">${escapeHtml(permission)}</span>`).join('')}</div>
-            <button type="button" class="secondary-button" data-toggle-teacher="${teacher.id}" data-active="${teacher.active}">
-                ${teacher.active ? 'إيقاف الحساب' : 'تفعيل الحساب'}
-            </button></article>`).join('')
+            <button type="button" class="secondary-button" data-toggle-teacher="${teacher.id}" data-active="${teacher.active}" ${teacher.invitation_accepted ? '' : 'disabled'}>
+                ${!teacher.invitation_accepted ? 'بانتظار قبول الدعوة' : teacher.active ? 'إيقاف الحساب' : 'تفعيل الحساب'}
+            </button>
+            ${teacher.invitation_accepted ? `<button type="button" class="secondary-button" data-reset-teacher-password="${teacher.id}">إرسال رابط إعادة تعيين كلمة المرور</button>` : ''}
+            </article>`).join('')
         : '<p class="empty-state">لا توجد حسابات معلمين.</p>';
 }
 
@@ -226,14 +238,33 @@ async function initialize() {
         return;
     }
 
-    profile = await backend.getProfile();
-    if (!profile || !profile.active) {
-        await backend.requireClient().auth.signOut();
+    try {
+        profile = await backend.getProfile();
+    } catch (error) {
+        console.error('Unable to verify the teacher profile.', error);
+        showStatus(`تعذر التحقق من صلاحيات الحساب: ${error.message}`, true);
+        const { error: signOutError } = await backend.requireClient().auth.signOut();
+        if (signOutError) console.error('Unable to sign out an unverified account.', signOutError);
         window.location.replace('teacher-login.html');
         return;
     }
 
-    profile.permissions = profile.permissions || [];
+    if (
+        !profile
+        || !profile.active
+        || !['owner', 'teacher'].includes(profile.role)
+        || !Array.isArray(profile.permissions)
+        || (profile.role === 'teacher' && !profile.invitation_accepted)
+        || (profile.role === 'teacher'
+            && !['reports', 'questions', 'interventions', 'support']
+                .some((permission) => profile.permissions.includes(permission)))
+    ) {
+        const { error: signOutError } = await backend.requireClient().auth.signOut();
+        if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
+        window.location.replace('teacher-login.html');
+        return;
+    }
+
     document.querySelector('#dashboard-account').textContent =
         `مرحبًا ${profile.display_name || profile.email}`;
     document.querySelector('#account-name').value = profile.display_name || '';
@@ -557,6 +588,24 @@ document.querySelector('#teacher-editor').addEventListener('submit', async (even
 });
 
 document.querySelector('#teacher-list').addEventListener('click', async (event) => {
+    const resetButton = event.target.closest('[data-reset-teacher-password]');
+    if (resetButton) {
+        const teacher = teachers.find((item) => item.id === resetButton.dataset.resetTeacherPassword);
+        if (!teacher) return;
+        resetButton.disabled = true;
+        try {
+            const redirectTo = new URL('update-password.html', window.location.href).toString();
+            const { error } = await backend.requireClient().auth.resetPasswordForEmail(teacher.email, { redirectTo });
+            if (error) throw error;
+            showStatus(`تم إرسال رابط إعادة تعيين كلمة المرور إلى ${teacher.email}.`);
+        } catch (error) {
+            showStatus(`تعذر إرسال رابط إعادة تعيين كلمة المرور: ${error.message}`, true);
+        } finally {
+            resetButton.disabled = false;
+        }
+        return;
+    }
+
     const button = event.target.closest('[data-toggle-teacher]');
     if (!button) return;
     const teacher = teachers.find((item) => item.id === button.dataset.toggleTeacher);

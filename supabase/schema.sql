@@ -6,10 +6,12 @@ create table if not exists public.profiles (
     display_name text not null default '',
     role text not null default 'teacher' check (role in ('owner', 'teacher')),
     active boolean not null default false,
+    invitation_accepted boolean not null default false,
     permissions text[] not null default '{}',
     created_at timestamptz not null default now()
 );
 alter table public.profiles add column if not exists email text not null default '';
+alter table public.profiles add column if not exists invitation_accepted boolean not null default false;
 
 create or replace function public.create_teacher_profile()
 returns trigger
@@ -43,6 +45,7 @@ as $$
         from public.profiles
         where id = (select auth.uid())
           and active
+          and (role = 'owner' or invitation_accepted)
     );
 $$;
 
@@ -74,8 +77,39 @@ as $$
         from public.profiles
         where id = (select auth.uid())
           and active
+          and invitation_accepted
           and required_permission = any(permissions)
     );
+$$;
+
+create or replace function public.accept_teacher_invitation()
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+    if auth.uid() is null or not exists (
+        select 1
+        from auth.users
+        where id = (select auth.uid())
+          and invited_at is not null
+          and email_confirmed_at is not null
+    ) then
+        raise exception 'يجب فتح رابط دعوة صالح من البريد الإلكتروني أولًا.';
+    end if;
+
+    update public.profiles
+    set invitation_accepted = true,
+        active = true
+    where id = (select auth.uid())
+      and role = 'teacher'
+      and not invitation_accepted;
+
+    if not found then
+        raise exception 'الدعوة غير صالحة أو سبق قبولها.';
+    end if;
+end;
 $$;
 
 create table if not exists public.app_content (
@@ -133,7 +167,9 @@ alter table public.assessment_attempts enable row level security;
 alter table public.support_tickets enable row level security;
 
 revoke all on public.profiles, public.app_content, public.assessment_attempts, public.support_tickets from anon, authenticated;
-grant select, update on public.profiles to authenticated;
+grant select on public.profiles to authenticated;
+revoke update on public.profiles from authenticated;
+grant update (active) on public.profiles to authenticated;
 grant select, insert, update, delete on public.app_content to authenticated;
 grant select on public.app_content to anon;
 grant insert on public.assessment_attempts to anon;
@@ -142,9 +178,11 @@ grant select, update, delete on public.support_tickets to authenticated;
 revoke all on function public.is_active_teacher() from public;
 revoke all on function public.is_platform_owner() from public;
 revoke all on function public.has_teacher_permission(text) from public;
+revoke all on function public.accept_teacher_invitation() from public, anon, authenticated;
 grant execute on function public.is_active_teacher() to anon, authenticated;
 grant execute on function public.is_platform_owner() to anon, authenticated;
 grant execute on function public.has_teacher_permission(text) to anon, authenticated;
+grant execute on function public.accept_teacher_invitation() to authenticated;
 
 drop policy if exists "Users read their own profile and owners read all" on public.profiles;
 create policy "Users read their own profile and owners read all"
