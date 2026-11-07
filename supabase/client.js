@@ -33,7 +33,7 @@
 
             const profile = await check(supabase
                 .from('profiles')
-                .select('id, display_name, role, active, invitation_accepted, permissions')
+                .select('id, email, display_name, role, active, invitation_accepted, permissions, school_name, assigned_grades, assigned_subjects')
                 .eq('id', userData.user.id)
                 .maybeSingle());
             return profile ? { ...profile, email: userData.user.email } : null;
@@ -90,7 +90,7 @@
             const supabase = this.requireClient();
             return await check(supabase
                 .from('profiles')
-                .select('id, email, display_name, role, active, invitation_accepted, permissions')
+                .select('id, email, display_name, role, active, invitation_accepted, permissions, school_name, assigned_grades, assigned_subjects')
                 .order('created_at', { ascending: true }));
         },
 

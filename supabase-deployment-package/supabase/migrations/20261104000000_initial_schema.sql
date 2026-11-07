@@ -4,14 +4,20 @@ create table if not exists public.profiles (
     id uuid primary key references auth.users (id) on delete cascade,
     email text not null default '',
     display_name text not null default '',
-    role text not null default 'teacher' check (role in ('owner', 'teacher')),
+    role text not null default 'teacher' check (role in ('owner', 'teacher', 'school_manager')),
     active boolean not null default false,
     invitation_accepted boolean not null default false,
     permissions text[] not null default '{}',
+    school_name text not null default '',
+    assigned_grades text[] not null default '{}',
+    assigned_subjects text[] not null default '{}',
     created_at timestamptz not null default now()
 );
 alter table public.profiles add column if not exists email text not null default '';
 alter table public.profiles add column if not exists invitation_accepted boolean not null default false;
+alter table public.profiles add column if not exists school_name text not null default '';
+alter table public.profiles add column if not exists assigned_grades text[] not null default '{}';
+alter table public.profiles add column if not exists assigned_subjects text[] not null default '{}';
 
 create or replace function public.create_teacher_profile()
 returns trigger

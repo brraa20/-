@@ -11,9 +11,18 @@ const panelPermissions = {
     questions: 'questions',
     interventions: 'interventions',
     support: 'support',
-    permissions: 'owner',
+    permissions: 'manage_teachers',
     settings: 'owner',
     account: 'owner'
+};
+
+const permissionLabels = {
+    reports: 'التقارير',
+    analytics: 'التحليلات',
+    questions: 'إدارة الأسئلة',
+    interventions: 'التدخل والشرح',
+    support: 'الدعم والمساندة',
+    manage_teachers: 'إدارة المعلمين'
 };
 
 let profile;
@@ -220,21 +229,64 @@ function renderSupport() {
 
 function renderTeachers() {
     document.querySelector('#teacher-list').innerHTML = teachers.length ? teachers
-        .filter((teacher) => teacher.role === 'teacher')
-        .map((teacher) => `<article class="data-card">
-            <strong>${escapeHtml(teacher.display_name || 'معلم/ة')}</strong>
+        .filter((teacher) => teacher.role !== 'owner')
+        .map((teacher) => `<article class="data-card" data-teacher-card="${escapeHtml(teacher.id)}">
+            <strong>${escapeHtml(teacher.display_name || (teacher.role === 'school_manager' ? 'مدير/ة مدرسة' : 'معلم/ة'))}</strong>
             <p>${escapeHtml(teacher.email)}</p>
+            ${profile.role === 'owner' ? `<label>الدور<select data-edit-role>
+                <option value="teacher"${teacher.role === 'teacher' ? ' selected' : ''}>معلم/ة</option>
+                <option value="school_manager"${teacher.role === 'school_manager' ? ' selected' : ''}>مدير/ة مدرسة</option>
+            </select></label>` : `<p>الدور: ${teacher.role === 'school_manager' ? 'مدير/ة مدرسة' : 'معلم/ة'}</p>`}
+            <p>المدرسة: ${escapeHtml(teacher.school_name || 'غير محددة')}</p>
+            <p>الصفوف: ${escapeHtml((teacher.assigned_grades || []).join('، ') || 'غير محددة')}</p>
+            <p>المواد: ${escapeHtml((teacher.assigned_subjects || []).join('، ') || 'غير محددة')}</p>
             <div class="meta-row"><span class="meta-tag">${
                 !teacher.invitation_accepted ? 'بانتظار قبول الدعوة'
                     : teacher.active ? 'نشط' : 'غير نشط'
             }</span>
-            ${teacher.permissions.map((permission) => `<span class="meta-tag">${escapeHtml(permission)}</span>`).join('')}</div>
-            <button type="button" class="secondary-button" data-toggle-teacher="${teacher.id}" data-active="${teacher.active}" ${teacher.invitation_accepted ? '' : 'disabled'}>
+            ${(['reports', 'analytics', 'questions', 'interventions', 'support', ...(profile.role === 'owner' || teacher.role === 'school_manager' ? ['manage_teachers'] : [])]
+                .filter((permission) => profile.role === 'owner' || (profile.permissions.includes(permission) && permission !== 'manage_teachers'))
+                .map((permission) => `<label${permission === 'manage_teachers' && teacher.role !== 'school_manager' ? ' class="hidden" style="display:none"' : ''}><input type="checkbox" data-edit-permission value="${permission}" ${teacher.permissions.includes(permission) ? 'checked' : ''} ${permission === 'manage_teachers' ? 'disabled' : profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}>${permissionLabels[permission]}</label>`).join(''))}</div>
+            <label>الصفوف المسندة<input type="text" data-edit-grades value="${escapeHtml((teacher.assigned_grades || []).join('، '))}" ${profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}></label>
+            <label>المواد المسندة<input type="text" data-edit-subjects value="${escapeHtml((teacher.assigned_subjects || []).join('، '))}" ${profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}></label>
+            ${profile.role === 'owner' ? `<label>المدرسة<input type="text" data-edit-school value="${escapeHtml(teacher.school_name || '')}"></label>` : ''}
+            <button type="button" class="primary-button" data-save-teacher="${escapeHtml(teacher.id)}" ${profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}>حفظ الصلاحيات والإسناد</button>
+            <button type="button" class="secondary-button" data-toggle-teacher="${teacher.id}" data-active="${teacher.active}" ${teacher.invitation_accepted && (profile.role === 'owner' || teacher.role === 'teacher') ? '' : 'disabled'}>
                 ${!teacher.invitation_accepted ? 'بانتظار قبول الدعوة' : teacher.active ? 'إيقاف الحساب' : 'تفعيل الحساب'}
             </button>
             ${teacher.invitation_accepted ? `<button type="button" class="secondary-button" data-reset-teacher-password="${teacher.id}">إرسال رابط إعادة تعيين كلمة المرور</button>` : ''}
             </article>`).join('')
         : '<p class="empty-state">لا توجد حسابات معلمين.</p>';
+}
+
+function updateTeacherInvitationForm() {
+    const roleField = document.querySelector('#teacher-role');
+    const schoolField = document.querySelector('#teacher-school');
+    const isOwner = profile.role === 'owner';
+
+    roleField.disabled = !isOwner;
+    schoolField.readOnly = !isOwner;
+    if (!isOwner) {
+        roleField.value = 'teacher';
+        schoolField.value = profile.school_name || '';
+    }
+    document.querySelectorAll('#teacher-editor input[name="permission"]').forEach((field) => {
+        const allowed = isOwner
+            ? field.value !== 'manage_teachers' || roleField.value === 'school_manager'
+            : field.value !== 'manage_teachers' && profile.permissions.includes(field.value);
+        const option = field.closest('label');
+        option.hidden = !allowed;
+        option.style.display = allowed ? '' : 'none';
+        field.disabled = isOwner && roleField.value === 'school_manager' && field.value === 'manage_teachers';
+        if (!allowed) field.checked = false;
+        if (isOwner && roleField.value === 'school_manager' && field.value === 'manage_teachers') {
+            field.checked = true;
+        }
+    });
+}
+
+function parseAssignmentList(value) {
+    return [...new Set(value.split(/[,،]/).map((item) => item.trim()).filter(Boolean))];
 }
 
 async function initialize() {
@@ -260,9 +312,9 @@ async function initialize() {
             .some((permission) => profile.permissions.includes(permission));
     const allowed = !!profile
         && profile.active === true
-        && ['owner', 'teacher'].includes(profile.role)
+        && ['owner', 'teacher', 'school_manager'].includes(profile.role)
         && (isOwner || profile.invitation_accepted === true)
-        && (isOwner || teacherHasPermission);
+        && (isOwner || teacherHasPermission || profile.permissions?.includes('manage_teachers'));
     if (!allowed) {
         const { error: signOutError } = await backend.requireClient().auth.signOut();
         if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
@@ -275,6 +327,8 @@ async function initialize() {
     document.querySelector('#account-name').value = profile.display_name || '';
     document.querySelector('#account-username').value = profile.email;
     document.querySelector('#account-email').value = profile.email;
+    document.querySelector('#teacher-school').value = profile.school_name || '';
+    updateTeacherInvitationForm();
 
     document.querySelectorAll('.dashboard-tab').forEach((button) => {
         const permission = panelPermissions[button.dataset.panel];
@@ -297,6 +351,9 @@ async function initialize() {
     document.querySelector('#language-setting').value = settings.language;
     document.querySelector('#show-student-details').checked = settings.showDetails;
     document.querySelector('#allow-support').checked = settings.allowSupport;
+    if (profile.role === 'owner' && !profile.school_name) {
+        document.querySelector('#teacher-school').value = settings.school || '';
+    }
 
     const skillSelect = document.querySelector('#question-skill');
     data.skills.forEach((skill) => skillSelect.add(new Option(`${skill.name} — ${skill.domain}`, skill.id)));
@@ -338,7 +395,7 @@ async function initialize() {
         tickets = await backend.loadTickets();
         renderSupport();
     }
-    if (profile.role === 'owner') {
+    if (can('manage_teachers')) {
         teachers = await backend.loadTeachers();
         renderTeachers();
     }
@@ -582,19 +639,61 @@ document.querySelector('#teacher-editor').addEventListener('submit', async (even
         const invitation = await backend.inviteTeacher({
             email: document.querySelector('#teacher-email').value.trim(),
             displayName: document.querySelector('#teacher-name').value.trim(),
+            role: document.querySelector('#teacher-role').value,
+            schoolName: document.querySelector('#teacher-school').value.trim(),
+            grades: parseAssignmentList(document.querySelector('#teacher-grades').value),
+            subjects: parseAssignmentList(document.querySelector('#teacher-subjects').value),
             permissions,
             redirectTo: new URL('create-password.html', window.location.href).toString()
         });
+        profile.school_name = document.querySelector('#teacher-school').value.trim();
         teachers = await backend.loadTeachers();
         renderTeachers();
         event.target.reset();
+        document.querySelector('#teacher-school').value = profile.school_name || '';
+        updateTeacherInvitationForm();
         showStatus(`أُرسلت دعوة المعلم إلى بريده الإلكتروني. سيُنشئ كلمة مروره عبر صفحة القبول: ${invitation.redirectTo}`);
     } catch (error) {
         showStatus(`تعذر دعوة المعلم: ${error.message}`, true);
     }
 });
 
+document.querySelector('#teacher-role').addEventListener('change', updateTeacherInvitationForm);
+
 document.querySelector('#teacher-list').addEventListener('click', async (event) => {
+    const saveButton = event.target.closest('[data-save-teacher]');
+    if (saveButton) {
+        const teacher = teachers.find((item) => item.id === saveButton.dataset.saveTeacher);
+        const card = saveButton.closest('[data-teacher-card]');
+        if (!teacher || !card) return;
+        saveButton.disabled = true;
+        try {
+            const updates = {
+                permissions: [...card.querySelectorAll('[data-edit-permission]:checked')].map((field) => field.value),
+                assigned_grades: parseAssignmentList(card.querySelector('[data-edit-grades]').value),
+                assigned_subjects: parseAssignmentList(card.querySelector('[data-edit-subjects]').value)
+            };
+            const roleField = card.querySelector('[data-edit-role]');
+            if (roleField) updates.role = roleField.value;
+            const schoolField = card.querySelector('[data-edit-school]');
+            if (schoolField) updates.school_name = schoolField.value.trim();
+            const { data, error } = await backend.requireClient().from('profiles')
+                .update(updates)
+                .eq('id', teacher.id)
+                .select('id')
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) throw new Error('لم يتم تحديث المستخدم. قد لا تملك صلاحية إدارته.');
+            teachers = await backend.loadTeachers();
+            renderTeachers();
+            showStatus('تم حفظ صلاحيات وإسناد المستخدم.');
+        } catch (error) {
+            showStatus(`تعذر حفظ صلاحيات المستخدم: ${error.message}`, true);
+            saveButton.disabled = false;
+        }
+        return;
+    }
+
     const resetButton = event.target.closest('[data-reset-teacher-password]');
     if (resetButton) {
         const teacher = teachers.find((item) => item.id === resetButton.dataset.resetTeacherPassword);
@@ -617,17 +716,35 @@ document.querySelector('#teacher-list').addEventListener('click', async (event) 
     if (!button) return;
     const teacher = teachers.find((item) => item.id === button.dataset.toggleTeacher);
     if (!teacher) return;
+    if (teacher.active && !confirm('سيُعطّل الحساب ويُمنع من الوصول إلى البيانات دون حذف سجلاته. هل تريد المتابعة؟')) return;
     try {
-        const { error } = await backend.requireClient().from('profiles')
+        const { data, error } = await backend.requireClient().from('profiles')
             .update({ active: !teacher.active })
-            .eq('id', teacher.id);
+            .eq('id', teacher.id)
+            .select('id')
+            .maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('لم يتم تحديث حالة الحساب. قد لا تملك صلاحية إدارته.');
         teachers = await backend.loadTeachers();
         renderTeachers();
         showStatus('تم تحديث حالة حساب المعلم.');
     } catch (error) {
         showStatus(`تعذر تحديث حساب المعلم: ${error.message}`, true);
     }
+});
+
+document.querySelector('#teacher-list').addEventListener('change', (event) => {
+    const roleField = event.target.closest('[data-edit-role]');
+    if (!roleField) return;
+    const managePermission = roleField.closest('[data-teacher-card]')
+        .querySelector('[data-edit-permission][value="manage_teachers"]');
+    const option = managePermission.closest('label');
+    const isManager = roleField.value === 'school_manager';
+    option.hidden = !isManager;
+    option.classList.toggle('hidden', !isManager);
+    option.style.display = isManager ? '' : 'none';
+    managePermission.checked = isManager;
+    managePermission.disabled = true;
 });
 
 void initialize().catch((error) => {

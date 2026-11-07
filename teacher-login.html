@@ -44,51 +44,8 @@
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
         const submitButton = form.querySelector('button[type="submit"]');
-        const ownerEmail = 'brraa.20@gmail.com';
-
-        function getProfileAccessError(profile, email) {
-            const isOwner = profile?.role === 'owner';
-            const isConfiguredOwner = email.trim().toLowerCase() === ownerEmail;
-            const projectRef = window.TalalaSupabaseConfig?.url
-                ? new URL(window.TalalaSupabaseConfig.url).hostname.split('.')[0]
-                : null;
-            const ownerSetupMessage = `شغّل ملف supabase/owner-setup.sql من SQL Editor في مشروع Supabase المرتبط بالموقع${projectRef ? ` (${projectRef})` : ''}، ثم تحقق أن النتيجة تعرض role = owner وactive = true.`;
-
-            if (!profile) {
-                return isConfiguredOwner
-                    ? `تم التحقق من كلمة المرور لكن لا يوجد ملف صلاحيات لهذا البريد. ${ownerSetupMessage}`
-                    : 'تم التحقق من كلمة المرور لكن لا يوجد ملف صلاحيات لهذا الحساب. اطلب من مالك المنصة التحقق من سجل profiles.';
-            }
-            if (!profile.active) {
-                return isConfiguredOwner
-                    ? `الحساب موجود لكنه غير نشط. ${ownerSetupMessage}`
-                    : 'الحساب غير نشط. اطلب من مالك المنصة تفعيله بعد مراجعة الدعوة.';
-            }
-            if (!['owner', 'teacher'].includes(profile.role)) {
-                return isConfiguredOwner
-                    ? `دور هذا الحساب ليس owner. ${ownerSetupMessage}`
-                    : 'دور الحساب غير صالح لدخول لوحة المعلم. تواصل مع مالك المنصة.';
-            }
-            if (!isOwner && !Array.isArray(profile.permissions)) {
-                return isConfiguredOwner
-                    ? `سجل صلاحيات المالك غير مكتمل. ${ownerSetupMessage}`
-                    : 'سجل صلاحيات الحساب غير مكتمل. تواصل مع مالك المنصة.';
-            }
-            if (profile.role === 'teacher' && !profile.invitation_accepted) {
-                return 'لم تُقبل دعوة هذا الحساب بعد. افتح رابط الدعوة المرسل إلى البريد وأنشئ كلمة المرور.';
-            }
-            if (
-                profile.role === 'teacher'
-                && !['reports', 'analytics', 'questions', 'interventions', 'support']
-                    .some((permission) => profile.permissions.includes(permission))
-            ) {
-                return 'لم تُمنح لهذا الحساب صلاحية في لوحة المعلم. اطلب من مالك المنصة تعديل صلاحياته.';
-            }
-            return null;
-        }
-
         if (!window.TalalaBackend.isConfigured) {
-            error.textContent = window.TalalaBackend.configurationMessage;
+            error.textContent = 'تعذر تسجيل الدخول حاليًا. يرجى المحاولة لاحقًا.';
             submitButton.disabled = true;
         }
 
@@ -119,25 +76,18 @@
                         .some((permission) => profile.permissions.includes(permission));
                 const allowed = !!profile
                     && profile.active === true
-                    && ['owner', 'teacher'].includes(profile.role)
+                    && ['owner', 'teacher', 'school_manager'].includes(profile.role)
                     && (isOwner || profile.invitation_accepted === true)
-                    && (isOwner || teacherHasPermission);
+                    && (isOwner || teacherHasPermission || profile.permissions?.includes('manage_teachers'));
                 if (!allowed) {
-                    const profileError = getProfileAccessError(profile, username.value);
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
-                    throw new Error(profileError || 'تعذر التحقق من صلاحيات الحساب. أعد المحاولة أو تواصل مع مالك المنصة.');
+                    throw new Error('Unauthorized account.');
                 }
                 window.location.replace('question-manager.html');
             } catch (signInError) {
-                const message = signInError.message || '';
-                if (/invalid login credentials/i.test(message)) {
-                    error.textContent = `بيانات الدخول غير صحيحة. تأكد أن المستخدم ${username.value.trim()} موجود في Authentication → Users بمشروع Supabase ${window.TalalaSupabaseConfig.url}، ثم استخدم «نسيت كلمة المرور؟» لإعداد كلمة مرور جديدة. ملف صلاحيات المنصة لا ينشئ حساب Auth ولا يغيّر كلمة مروره.`;
-                } else {
-                    error.textContent = message === window.TalalaBackend?.configurationMessage
-                        ? message
-                        : message || 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.';
-                }
+                console.error('Unable to sign in.', signInError);
+                error.textContent = 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مجددًا.';
             } finally {
                 submitButton.disabled = !window.TalalaBackend.isConfigured;
             }
@@ -161,10 +111,8 @@
                 if (resetError) throw resetError;
                 error.textContent = 'إذا كان البريد مسجلًا، ستصلك رسالة لإعادة تعيين كلمة المرور.';
             } catch (resetError) {
-                const message = resetError.message || 'تعذر إرسال رسالة إعادة التعيين.';
-                error.textContent = /redirect|url not allowed/i.test(message)
-                    ? `رفض Supabase عنوان التحويل. أضف هذا العنوان إلى قائمة Redirect URLs المسموح بها: ${new URL('update-password.html', window.location.href).toString()}`
-                    : `${message} إذا لم يفتح الرابط، تأكد من إضافة عنوان update-password.html إلى Redirect URLs في Supabase.`;
+                console.error('Unable to send a password reset email.', resetError);
+                error.textContent = 'تعذر إرسال رسالة إعادة التعيين. يرجى المحاولة لاحقًا.';
             } finally {
                 forgotPasswordButton.disabled = false;
             }

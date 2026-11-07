@@ -12,7 +12,20 @@ const allowedPermissions = new Set([
   "questions",
   "interventions",
   "support",
+  "manage_teachers",
 ]);
+
+function normalizeAssignments(value: unknown): string[] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length > 30 ||
+    value.some((item) => typeof item !== "string" || !item.trim() || item.trim().length > 100)
+  ) {
+    return null;
+  }
+  const assignments = value.map((item) => item.trim());
+  return new Set(assignments).size === assignments.length ? assignments : null;
+}
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -56,26 +69,44 @@ Deno.serve(async (request) => {
 
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
-    .select("role, active")
+    .select("role, active, invitation_accepted, permissions, school_name, assigned_grades, assigned_subjects")
     .eq("id", userData.user.id)
     .maybeSingle();
   if (profileError) {
     console.error("Could not verify the teacher account.", profileError);
     return response({ error: "Could not verify account permissions." }, 500);
   }
-  if (profile?.role !== "owner" || !profile.active) {
-    return response({ error: "Only the active platform owner can invite teachers." }, 403);
+  const isOwner = profile?.role === "owner" && profile.active;
+  const isSchoolManager = profile?.role === "school_manager" &&
+    profile.active &&
+    profile.invitation_accepted &&
+    profile.permissions.includes("manage_teachers");
+  if (!isOwner && !isSchoolManager) {
+    return response({ error: "An active owner or authorized school manager is required." }, 403);
   }
 
-  let input: { email?: string; displayName?: string; permissions?: string[]; redirectTo?: string };
+  let input: {
+    email?: string;
+    displayName?: string;
+    role?: string;
+    schoolName?: string;
+    grades?: unknown;
+    subjects?: unknown;
+    permissions?: string[];
+    redirectTo?: string;
+  };
   try {
     input = await request.json();
   } catch {
     return response({ error: "Invalid JSON request." }, 400);
   }
 
-  const email = input.email?.trim().toLowerCase();
-  const displayName = input.displayName?.trim();
+  const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
+  const displayName = typeof input.displayName === "string" ? input.displayName.trim() : "";
+  const role = input.role ?? "teacher";
+  const schoolName = typeof input.schoolName === "string" ? input.schoolName.trim() : "";
+  const grades = normalizeAssignments(input.grades);
+  const subjects = normalizeAssignments(input.subjects);
   const permissions = input.permissions;
   if (
     !email ||
@@ -83,13 +114,70 @@ Deno.serve(async (request) => {
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
     !displayName ||
     displayName.length > 120 ||
+    !schoolName ||
+    schoolName.length > 160 ||
+    !["teacher", "school_manager"].includes(role) ||
+    (role === "school_manager" && !isOwner) ||
+    !grades ||
+    !subjects ||
     !Array.isArray(permissions) ||
+    permissions.length === 0 ||
+    new Set(permissions).size !== permissions.length ||
     permissions.some((permission) => !allowedPermissions.has(permission)) ||
-    !permissions.some((permission) =>
-      ["reports", "analytics", "questions", "interventions", "support"].includes(permission)
-    )
+    (role === "school_manager" && !permissions.includes("manage_teachers")) ||
+    (role === "teacher" && permissions.includes("manage_teachers")) ||
+    (permissions.some((permission) => ["reports", "analytics"].includes(permission)) && grades.length === 0)
   ) {
     return response({ error: "Teacher details or permissions are invalid." }, 400);
+  }
+  if (isSchoolManager && profile) {
+    const managerPermissions = profile.permissions.filter((permission: string) => permission !== "manage_teachers");
+    if (
+      role !== "teacher" ||
+      !profile.school_name.trim() ||
+      schoolName.toLocaleLowerCase() !== profile.school_name.trim().toLocaleLowerCase() ||
+      permissions.some((permission) => !managerPermissions.includes(permission)) ||
+      grades.some((grade) => !profile.assigned_grades.includes(grade)) ||
+      subjects.some((subject) => !profile.assigned_subjects.includes(subject))
+    ) {
+      return response({ error: "The invitation exceeds the manager's school or assigned access." }, 403);
+    }
+  }
+  if (isOwner && profile) {
+    const ownerSchool = profile.school_name.trim();
+    if (ownerSchool && ownerSchool.toLocaleLowerCase() !== schoolName.toLocaleLowerCase()) {
+      return response({ error: "All accounts in this Supabase project must belong to its configured school." }, 403);
+    }
+
+    if (!ownerSchool) {
+      const { data: savedOwner, error: saveSchoolError } = await adminClient
+        .from("profiles")
+        .update({ school_name: schoolName })
+        .eq("id", userData.user.id)
+        .eq("school_name", "")
+        .select("school_name")
+        .maybeSingle();
+      if (saveSchoolError) {
+        console.error("Could not set the platform school.", saveSchoolError);
+        return response({ error: "Could not set the platform school." }, 500);
+      }
+      let persistedOwnerSchool: string | null = savedOwner?.school_name ?? null;
+      if (!persistedOwnerSchool) {
+        const { data: currentOwner, error: currentOwnerError } = await adminClient
+          .from("profiles")
+          .select("school_name")
+          .eq("id", userData.user.id)
+          .single();
+        if (currentOwnerError || !currentOwner) {
+          console.error("Could not verify the platform school.", currentOwnerError);
+          return response({ error: "Could not verify the platform school." }, 500);
+        }
+        persistedOwnerSchool = currentOwner.school_name;
+      }
+      if (persistedOwnerSchool.trim().toLocaleLowerCase() !== schoolName.toLocaleLowerCase()) {
+        return response({ error: "All accounts in this Supabase project must belong to its configured school." }, 403);
+      }
+    }
   }
 
   const requestOrigin = request.headers.get("Origin");
@@ -131,12 +219,15 @@ Deno.serve(async (request) => {
       id: invitation.user.id,
       email,
       display_name: displayName,
-      role: "teacher",
+      role,
+      school_name: schoolName,
+      assigned_grades: grades,
+      assigned_subjects: subjects,
       active: false,
       invitation_accepted: false,
       permissions,
     }, { onConflict: "id" })
-    .select("id, permissions")
+    .select("id, role, permissions")
     .single();
   if (updateError || !teacherProfile) {
     console.error("Could not assign teacher permissions.", updateError);
