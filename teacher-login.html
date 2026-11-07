@@ -44,6 +44,48 @@
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
         const submitButton = form.querySelector('button[type="submit"]');
+        const ownerEmail = 'brraa.20@gmail.com';
+
+        function getProfileAccessError(profile, email) {
+            const isConfiguredOwner = email.trim().toLowerCase() === ownerEmail;
+            const projectRef = window.TalalaSupabaseConfig?.url
+                ? new URL(window.TalalaSupabaseConfig.url).hostname.split('.')[0]
+                : null;
+            const ownerSetupMessage = `شغّل ملف supabase/owner-setup.sql من SQL Editor في مشروع Supabase المرتبط بالموقع${projectRef ? ` (${projectRef})` : ''}، ثم تحقق أن النتيجة تعرض role = owner وactive = true.`;
+
+            if (!profile) {
+                return isConfiguredOwner
+                    ? `تم التحقق من كلمة المرور لكن لا يوجد ملف صلاحيات لهذا البريد. ${ownerSetupMessage}`
+                    : 'تم التحقق من كلمة المرور لكن لا يوجد ملف صلاحيات لهذا الحساب. اطلب من مالك المنصة التحقق من سجل profiles.';
+            }
+            if (!profile.active) {
+                return isConfiguredOwner
+                    ? `الحساب موجود لكنه غير نشط. ${ownerSetupMessage}`
+                    : 'الحساب غير نشط. اطلب من مالك المنصة تفعيله بعد مراجعة الدعوة.';
+            }
+            if (!['owner', 'teacher'].includes(profile.role)) {
+                return isConfiguredOwner
+                    ? `دور هذا الحساب ليس owner. ${ownerSetupMessage}`
+                    : 'دور الحساب غير صالح لدخول لوحة المعلم. تواصل مع مالك المنصة.';
+            }
+            if (!Array.isArray(profile.permissions)) {
+                return isConfiguredOwner
+                    ? `سجل صلاحيات المالك غير مكتمل. ${ownerSetupMessage}`
+                    : 'سجل صلاحيات الحساب غير مكتمل. تواصل مع مالك المنصة.';
+            }
+            if (profile.role === 'teacher' && !profile.invitation_accepted) {
+                return 'لم تُقبل دعوة هذا الحساب بعد. افتح رابط الدعوة المرسل إلى البريد وأنشئ كلمة المرور.';
+            }
+            if (
+                profile.role === 'teacher'
+                && !['reports', 'analytics', 'questions', 'interventions', 'support']
+                    .some((permission) => profile.permissions.includes(permission))
+            ) {
+                return 'لم تُمنح لهذا الحساب صلاحية في لوحة المعلم. اطلب من مالك المنصة تعديل صلاحياته.';
+            }
+            return null;
+        }
+
         if (!window.TalalaBackend.isConfigured) {
             error.textContent = window.TalalaBackend.configurationMessage;
             submitButton.disabled = true;
@@ -70,19 +112,11 @@
                     throw profileError;
                 }
 
-                if (
-                    !profile
-                    || !profile.active
-                    || !['owner', 'teacher'].includes(profile.role)
-                    || !Array.isArray(profile.permissions)
-                    || (profile.role === 'teacher' && !profile.invitation_accepted)
-                    || (profile.role === 'teacher'
-                        && !['reports', 'analytics', 'questions', 'interventions', 'support']
-                            .some((permission) => profile.permissions.includes(permission)))
-                ) {
+                const profileError = getProfileAccessError(profile, username.value);
+                if (profileError) {
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
-                    throw new Error('هذا الحساب غير نشط أو لم يقبل دعوة البريد أو لم تُمنح له صلاحية في لوحة المعلم.');
+                    throw new Error(profileError);
                 }
                 window.location.replace('question-manager.html');
             } catch (signInError) {
