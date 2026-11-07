@@ -130,9 +130,14 @@
                 }
                 window.location.replace('question-manager.html');
             } catch (signInError) {
-                error.textContent = signInError.message === window.TalalaBackend?.configurationMessage
-                    ? signInError.message
-                    : signInError.message || 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.';
+                const message = signInError.message || '';
+                if (/invalid login credentials/i.test(message)) {
+                    error.textContent = `بيانات الدخول غير صحيحة. تأكد أن المستخدم ${username.value.trim()} موجود في Authentication → Users بمشروع Supabase ${window.TalalaSupabaseConfig.url}، ثم استخدم «نسيت كلمة المرور؟» لإعداد كلمة مرور جديدة. ملف صلاحيات المنصة لا ينشئ حساب Auth ولا يغيّر كلمة مروره.`;
+                } else {
+                    error.textContent = message === window.TalalaBackend?.configurationMessage
+                        ? message
+                        : message || 'تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.';
+                }
             } finally {
                 submitButton.disabled = !window.TalalaBackend.isConfigured;
             }
