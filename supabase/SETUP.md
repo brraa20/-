@@ -6,7 +6,7 @@
 
 1. افتح مشروع Supabase ثم **SQL Editor → New query**.
 2. انسخ محتوى `schema.sql` كاملًا ونفّذه.
-3. عند تحديث مشروع موجود، نفّذ كذلك ملف `migrations/20261107_teacher_invitation_acceptance.sql`. الحسابات القديمة التي سبق أن قبلت دعوة بريد مؤكدة تبقى مقبولة؛ الحسابات الأخرى تحتاج دعوة صالحة.
+3. عند تحديث مشروع موجود، نفّذ كذلك ملف `migrations/20261107_teacher_invitation_acceptance.sql`. تُعتمد الدعوات القديمة التي أكد أصحابها بريدهم، مع بقاء أي حساب أوقفه المالك غير نشط.
 4. من **Authentication → Providers → Email** فعّل البريد الإلكتروني. يلزم إعداد SMTP موثوق إذا أردت وصول دعوات المعلمين إلى بريدهم.
 5. من **Authentication → URL Configuration** أضف عنوان الموقع المنشور إلى Site URL وRedirect URLs؛ مثل `https://OWNER.github.io/REPOSITORY/`.
 

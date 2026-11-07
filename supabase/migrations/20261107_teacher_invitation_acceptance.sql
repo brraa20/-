@@ -6,7 +6,6 @@ set invitation_accepted = true
 from auth.users as auth_user
 where profile.id = auth_user.id
   and profile.role = 'teacher'
-  and profile.active
   and auth_user.invited_at is not null
   and auth_user.email_confirmed_at is not null;
 
