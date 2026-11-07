@@ -254,16 +254,16 @@ async function initialize() {
         return;
     }
 
-    if (
-        !profile
-        || !profile.active
-        || !['owner', 'teacher'].includes(profile.role)
-        || !Array.isArray(profile.permissions)
-        || (profile.role === 'teacher' && !profile.invitation_accepted)
-        || (profile.role === 'teacher'
-            && !['reports', 'analytics', 'questions', 'interventions', 'support']
-                .some((permission) => profile.permissions.includes(permission)))
-    ) {
+    const isOwner = profile?.role === 'owner';
+    const teacherHasPermission = Array.isArray(profile?.permissions)
+        && ['reports', 'analytics', 'questions', 'interventions', 'support']
+            .some((permission) => profile.permissions.includes(permission));
+    const allowed = !!profile
+        && profile.active === true
+        && ['owner', 'teacher'].includes(profile.role)
+        && (isOwner || profile.invitation_accepted === true)
+        && (isOwner || teacherHasPermission);
+    if (!allowed) {
         const { error: signOutError } = await backend.requireClient().auth.signOut();
         if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
         window.location.replace('teacher-login.html');

@@ -47,6 +47,7 @@
         const ownerEmail = 'brraa.20@gmail.com';
 
         function getProfileAccessError(profile, email) {
+            const isOwner = profile?.role === 'owner';
             const isConfiguredOwner = email.trim().toLowerCase() === ownerEmail;
             const projectRef = window.TalalaSupabaseConfig?.url
                 ? new URL(window.TalalaSupabaseConfig.url).hostname.split('.')[0]
@@ -68,7 +69,7 @@
                     ? `دور هذا الحساب ليس owner. ${ownerSetupMessage}`
                     : 'دور الحساب غير صالح لدخول لوحة المعلم. تواصل مع مالك المنصة.';
             }
-            if (!Array.isArray(profile.permissions)) {
+            if (!isOwner && !Array.isArray(profile.permissions)) {
                 return isConfiguredOwner
                     ? `سجل صلاحيات المالك غير مكتمل. ${ownerSetupMessage}`
                     : 'سجل صلاحيات الحساب غير مكتمل. تواصل مع مالك المنصة.';
@@ -112,11 +113,20 @@
                     throw profileError;
                 }
 
-                const profileError = getProfileAccessError(profile, username.value);
-                if (profileError) {
+                const isOwner = profile?.role === 'owner';
+                const teacherHasPermission = Array.isArray(profile?.permissions)
+                    && ['reports', 'analytics', 'questions', 'interventions', 'support']
+                        .some((permission) => profile.permissions.includes(permission));
+                const allowed = !!profile
+                    && profile.active === true
+                    && ['owner', 'teacher'].includes(profile.role)
+                    && (isOwner || profile.invitation_accepted === true)
+                    && (isOwner || teacherHasPermission);
+                if (!allowed) {
+                    const profileError = getProfileAccessError(profile, username.value);
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
-                    throw new Error(profileError);
+                    throw new Error(profileError || 'تعذر التحقق من صلاحيات الحساب. أعد المحاولة أو تواصل مع مالك المنصة.');
                 }
                 window.location.replace('question-manager.html');
             } catch (signInError) {

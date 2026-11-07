@@ -23,16 +23,16 @@
 
         async getProfile() {
             const supabase = this.requireClient();
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError) throw sessionError;
-            if (!sessionData.session) return null;
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError) throw userError;
+            if (!userData.user) return null;
 
             const profile = await check(supabase
                 .from('profiles')
                 .select('id, display_name, role, active, invitation_accepted, permissions')
-                .eq('id', sessionData.session.user.id)
+                .eq('id', userData.user.id)
                 .maybeSingle());
-            return profile ? { ...profile, email: sessionData.session.user.email } : null;
+            return profile ? { ...profile, email: userData.user.email } : null;
         },
 
         async loadContent(contentKey) {
