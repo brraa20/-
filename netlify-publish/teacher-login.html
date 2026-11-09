@@ -55,11 +55,16 @@
             submitButton.disabled = true;
             try {
                 const supabase = window.TalalaBackend.requireClient();
-                const { error: signInError } = await supabase.auth.signInWithPassword({
+                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                     email: username.value.trim(),
                     password: password.value
                 });
                 if (signInError) throw signInError;
+
+                if (signInData.user?.email?.trim().toLowerCase() === 'brraa.20@gmail.com') {
+                    window.location.replace('question-manager.html');
+                    return;
+                }
 
                 const profile = await window.TalalaBackend.getProfile();
 
