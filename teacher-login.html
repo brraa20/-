@@ -61,14 +61,7 @@
                 });
                 if (signInError) throw signInError;
 
-                let profile;
-                try {
-                    profile = await window.TalalaBackend.getProfile();
-                } catch (profileError) {
-                    const { error: signOutError } = await supabase.auth.signOut();
-                    if (signOutError) console.error('Unable to clear an unverified login session.', signOutError);
-                    throw profileError;
-                }
+                const profile = await window.TalalaBackend.getProfile();
 
                 const isOwner = profile?.role === 'owner';
                 const teacherHasPermission = Array.isArray(profile?.permissions)
