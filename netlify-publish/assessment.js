@@ -1,6 +1,12 @@
 const studentName = sessionStorage.getItem('talalaStudentName');
 const studentGrade = sessionStorage.getItem('talalaStudentGrade');
 const data = window.TalalaAssessmentData;
+const gradeNames = ['الأول الابتدائي', 'الثاني الابتدائي', 'الثالث الابتدائي', 'الرابع الابتدائي', 'الخامس الابتدائي', 'السادس الابتدائي', 'الأول المتوسط', 'الثاني المتوسط', 'الثالث المتوسط'];
+const gradeIndex = gradeNames.indexOf(studentGrade);
+const gradeBand = gradeIndex < 3 ? 'lower-primary' : gradeIndex < 6 ? 'upper-primary' : 'middle';
+const gradeStep = gradeIndex < 0 ? 1 : gradeIndex % 3;
+const gradeAnchor = `مؤشرات ${data.gradeBands?.[gradeBand]?.anchor || 'الصف الثالث الابتدائي'}`;
+const gradeProgression = data.gradeBands?.[gradeBand]?.progression?.[gradeStep] || '';
 
 if (!studentName || !studentGrade || sessionStorage.getItem('talalaAssessmentStarted') !== 'true') {
     window.location.replace(studentName && studentGrade ? 'assessment-instructions.html' : 'index.html');
@@ -63,6 +69,16 @@ function skillById(id) {
     return data.skills.find((skill) => skill.id === id);
 }
 
+function getQuestionDifficulty(question, index) {
+    if ([1, 2, 3].includes(Number(question.difficulty))) return Number(question.difficulty);
+    const defaults = [1, 2, 2, 3, 3];
+    return defaults[index % defaults.length];
+}
+
+function questionsForGrade(questions) {
+    return questions.filter((question) => !question.gradeBand || question.gradeBand === gradeBand);
+}
+
 function getQuestions() {
     if (state.stage === 'diagnostic') return data.questions.diagnostic;
     if (state.stage === 'reassessment') return state.interventionQuestions;
@@ -95,10 +111,12 @@ function renderQuestion() {
     const answers = getAnswers();
     const question = questions[state.index];
     const skill = skillById(question.skill);
+    const difficultyLabel = ['سهل', 'متوسط', 'صعب'][question.difficulty - 1] || 'متوسط';
 
     content.innerHTML = `
         <section class="question-card">
             <span class="skill-tag">${escapeHtml(skill.domain)} — ${escapeHtml(skill.name)}</span>
+            <p class="local-storage-note">مستوى الصعوبة: ${difficultyLabel} • ${gradeAnchor}: ${gradeProgression}</p>
             ${question.passage ? `<p class="passage">${escapeHtml(question.passage)}</p>` : ''}
             <h2 class="question-text">${escapeHtml(question.text)}</h2>
             <div class="answer-grid" role="radiogroup" aria-label="خيارات الإجابة">
@@ -155,29 +173,29 @@ function recordProcessStep(step, round, details = {}) {
 
 const skillInterventions = {
     literal: {
-        goal: 'تحديد المعلومات الواردة مباشرةً في النص.',
-        action: 'اقرأ السطر مرة واحدة، ثم أعد قراءة العبارة الدالة وحدد ما ذُكر دون إضافة تفسير.',
-        example: 'في نص القندس: أين يعيش؟ الجواب الوارد حرفيًا هو «قرب الأنهار والبحيرات».'
+        goal: 'استخراج الحقائق والأفكار الصريحة، وتحديد عناصر النص وترتيب أحداثه.',
+        action: 'اقرأ المقطع، وضع خطًا تحت الأسماء والأفعال والتواريخ، ثم أعد ترتيب المعلومات كما وردت.',
+        example: 'إذا ذكر النص أن سارة زرعت بذرة ثم سقتها، فالزرع يسبق السقي في ترتيب الحدثين.'
     },
     inferential: {
-        goal: 'ربط الدلائل للوصول إلى استنتاج معقول.',
-        action: 'حدّد دليلًا ظاهرًا في النص، اسأل «لماذا؟»، ثم اكتب استنتاجًا يدعمه دليل واحد على الأقل.',
-        example: 'إذا حمل سليم مظلته، فدليل الغيوم يدعم استنتاج احتمال المطر.'
+        goal: 'استنتاج الأسباب والنتائج والدوافع، ومقارنة الأفكار والشخصيات بأدلة من النص.',
+        action: 'اجمع قرينتين من المقطع، ثم اربطهما باستنتاج أو وجه شبه/اختلاف، وميّز ما يدعمه النص عما هو تخمين.',
+        example: 'إذا تأخر القطار ووصل المسافر بعد الموعد، فالتأخر سبب محتمل للوصول المتأخر.'
     },
     vocab: {
-        goal: 'استنتاج معنى المفردة من سياق النص.',
-        action: 'غطّ المفردة، اقترح معاني محتملة من الجملة، ثم اختر معنى يناسب التركيب كاملًا.',
-        example: 'في «اقتربت السحابة رزانة» يفهم معنى رزانة من ارتباطها بالهدوء والحكمة.'
+        goal: 'تحديد المعنى والمرادف والضد، وتصنيف المفردات وتوظيفها في سياقات جديدة.',
+        action: 'استخدم الجملة لفهم المفردة، ثم جرّب مرادفًا وضدًا لها، وحدد نوعها أو عددها عند ملاءمة السؤال.',
+        example: 'في «طريق واسع»، يدل السياق على أن «ضيق» ضد «واسع»، ويمكن استعمال الكلمتين في جملتين.'
     },
     structure: {
-        goal: 'تمييز بنية النص والعلاقات بين أفكاره.',
-        action: 'ارسم جملة الفكرة الرئيسة، ثم ضع أسهمًا تمثل السبب والنتيجة أو المشكلة والحل.',
-        example: 'عبارة «لأن» تدل على سبب، أما العبارة التي تليه فتوضح النتيجة.'
+        goal: 'تحديد فكرة النص ونوعه وغرضه، وتحليل الروابط بين جمله وفقراته.',
+        action: 'ابحث عن العنوان وأدوات الربط وترتيب الفقرات، ثم لخّص وظيفة كل فقرة وعلاقتها بما قبلها.',
+        example: '«لذلك» قد تقدم نتيجة، و«على الرغم من ذلك» تقدم استدراكًا أو فكرة مخالفة.'
     },
     critical: {
-        goal: 'تقييم الادعاءات والأدلة منطقياً.',
-        action: 'قس الدليل إلى مصدره ومعلوماته، واسأل هل يمكن التحقق منه وماذا تثبت فعليًا؟',
-        example: 'الإعلان الذي يقدم بيانات قابلة للتحقق أقوى من عبارة «إنه الأفضل».'
+        goal: 'تقويم الرأي والقيم والتعبيرات، وفحص الأدلة واقتراح بدائل وحلول معللة.',
+        action: 'ميّز الحقيقة من الرأي، وقيّم كفاية الدليل ومصدره، ثم اكتب حكمًا أو حلًا مع تعليل من النص.',
+        example: 'القول إن مبادرة نجحت يحتاج إلى نتائج قابلة للتحقق، لا إلى وصفها بأنها «الأفضل» فقط.'
     }
 };
 
@@ -197,6 +215,12 @@ async function initializeAssessment() {
             }
             interventions = JSON.parse(localStorage.getItem('talalaInterventionBank') || '[]');
         }
+        const gradeQuestions = data.gradeBands?.[gradeBand]?.questions;
+        if (gradeQuestions) {
+            ['diagnostic', 'intervention', 'final'].forEach((stage) => {
+                data.questions[stage] = [...data.questions[stage], ...gradeQuestions[stage]];
+            });
+        }
         if (Array.isArray(interventions)) {
             interventions.forEach((intervention) => {
                 if (skillInterventions[intervention.skill] && intervention.content) {
@@ -204,6 +228,16 @@ async function initializeAssessment() {
                 }
             });
         }
+        ['diagnostic', 'intervention', 'final'].forEach((stage) => {
+            data.questions[stage] = data.questions[stage]
+                .map((question, index) => ({
+                    ...question,
+                    difficulty: getQuestionDifficulty(question, index)
+                }))
+                .sort((first, second) =>
+                    Number(second.gradeBand === gradeBand) - Number(first.gradeBand === gradeBand)
+                    || first.difficulty - second.difficulty);
+        });
     } catch (error) {
         console.error('Unable to load the shared question bank.', error);
         content.innerHTML = `<p class="error" role="alert">تعذر تحميل بنك الأسئلة المشترك: ${escapeHtml(error.message)}</p>`;
@@ -254,7 +288,7 @@ function renderIntervention() {
     content.innerHTML = `
         <section class="intervention-card">
             <h2>${weakSkills.length ? `خطة العلاج والتنمية — الجولة ${round}` : 'تحقق الإتقان في جميع المهارات'}</h2>
-            <p class="learning-path">التشخيص ← شرح الأخطاء ← علاج المهارات الأقل من ${masteryThreshold}% ← إعادة القياس حتى الإتقان ← الاختبار الشامل</p>
+            <p class="learning-path">${gradeAnchor}: ${gradeProgression}. التشخيص ← شرح الأخطاء ← علاج المهارات الأقل من ${masteryThreshold}% ← إعادة القياس بأسئلة متدرجة: سهل، متوسط، صعب ← الاختبار الشامل</p>
             ${weakSkills.length ? `
                 <div class="lesson-grid">
                     ${weakSkills.map((skill) => {
@@ -289,18 +323,31 @@ function renderIntervention() {
 function startInterventionAssessment() {
     const round = state.interventionHistory.length + 1;
     const questionPool = [
-        ...data.questions.intervention,
-        ...data.questions.diagnostic,
-        ...data.questions.final
+        ...data.questions.intervention.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        })),
+        ...data.questions.diagnostic.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        })),
+        ...data.questions.final.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        }))
     ];
     const selectedQuestions = state.targetSkillIds.flatMap((skillId) => {
-        const seen = new Set();
-        return shuffle(questionPool.filter((question) => question.skill === skillId))
-            .filter((question) => {
-                if (seen.has(question.text)) return false;
-                seen.add(question.text);
-                return true;
-            });
+        const available = questionsForGrade(questionPool)
+            .filter((question) => question.skill === skillId)
+            .filter((question, index, questions) =>
+                questions.findIndex((item) => item.text === question.text) === index);
+        const selected = [1, 2, 3].map((difficulty) =>
+            (() => {
+                const eligible = available.filter((question) => question.difficulty === difficulty);
+                const gradeSpecific = eligible.filter((question) => question.gradeBand === gradeBand);
+                return shuffle(gradeSpecific.length ? gradeSpecific : eligible)[0];
+            })());
+        return selected.filter(Boolean);
     });
 
     if (!selectedQuestions.length || state.targetSkillIds.some((skillId) =>
@@ -373,25 +420,59 @@ function renderInterventionOutcome() {
 function buildFinalQuestions() {
     const usedStorageKey = `talalaUsedFinalQuestions-${encodeURIComponent(studentName)}-${encodeURIComponent(studentGrade)}`;
     const usedIds = JSON.parse(localStorage.getItem(usedStorageKey) || '[]');
-    const sourceQuestions = data.questions.final.length >= 20
-        ? data.questions.final
-        : data.questions.diagnostic;
+    const sourceQuestions = questionsForGrade([
+        ...data.questions.final.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        })),
+        ...data.questions.intervention.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        })),
+        ...data.questions.diagnostic.map((question, index) => ({
+            ...question,
+            difficulty: getQuestionDifficulty(question, index)
+        }))
+    ]);
+    const difficultyPlan = gradeStep === 0 ? [1, 1, 2, 3]
+        : gradeStep === 1 ? [1, 2, 2, 3]
+            : [1, 2, 3, 3];
     const skillQuestions = data.skills.map((skill) => {
         const available = sourceQuestions
             .filter((question) => question.skill === skill.id)
             .filter((question) => !usedIds.includes(`${skill.id}-${question.text}`))
-            .map((question, index) => ({ ...question, uid: `${skill.id}-${question.text}`, variant: index + 1 }));
-        return available.length ? available : sourceQuestions.filter((question) => question.skill === skill.id).map((question) => ({ ...question, uid: `${skill.id}-${question.text}-repeat`, variant: question.variant || 1 }));
+            .map((question) => ({ ...question, uid: `${skill.id}-${question.text}` }));
+        const allForSkill = available.length ? available : sourceQuestions
+            .filter((question) => question.skill === skill.id)
+            .map((question) => ({ ...question, uid: `${skill.id}-${question.text}-repeat` }));
+        const selected = [];
+        difficultyPlan.forEach((difficulty) => {
+            const eligible = allForSkill.filter((question) =>
+                question.difficulty === difficulty
+                && !selected.some((item) => item.text === question.text));
+            const gradeSpecific = eligible.filter((question) => question.gradeBand === gradeBand);
+            const candidate = shuffle(gradeSpecific.length ? gradeSpecific : eligible)[0];
+            if (candidate) selected.push(candidate);
+        });
+        if (selected.length < 4) {
+            shuffle(allForSkill).forEach((question) => {
+                if (selected.length < 4 && !selected.some((item) => item.text === question.text)) {
+                    selected.push(question);
+                }
+            });
+        }
+        return selected;
     });
 
-    const questions = skillQuestions.flatMap((list) => shuffle(list).slice(0, 4));
+    const questions = skillQuestions.flatMap((list) => list.slice(0, 4));
     if (questions.length < 20) {
         const sourcePool = [...sourceQuestions];
         while (questions.length < 20) {
             questions.push({ ...sourcePool[questions.length % sourcePool.length], uid: `${sourcePool[questions.length % sourcePool.length].uid || sourcePool[questions.length % sourcePool.length].text}-repeat-${questions.length}` });
         }
     }
-    const selected = shuffle(questions).slice(0, 20);
+    const selected = shuffle(questions).slice(0, 20)
+        .sort((first, second) => first.difficulty - second.difficulty);
     localStorage.setItem(usedStorageKey, JSON.stringify([...usedIds, ...selected.map((question) => question.uid)].slice(-240)));
     state.finalQuestions = selected;
 }
