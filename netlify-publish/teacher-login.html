@@ -55,18 +55,20 @@
             submitButton.disabled = true;
             try {
                 const supabase = window.TalalaBackend.requireClient();
-                const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                const { error: signInError } = await supabase.auth.signInWithPassword({
                     email: username.value.trim(),
                     password: password.value
                 });
                 if (signInError) throw signInError;
 
-                if (signInData.user?.email?.trim().toLowerCase() === 'brraa.20@gmail.com') {
-                    window.location.replace('question-manager.html');
-                    return;
+                let profile;
+                try {
+                    profile = await window.TalalaBackend.getProfile();
+                } catch (profileError) {
+                    const { error: signOutError } = await supabase.auth.signOut();
+                    if (signOutError) console.error('Unable to clear an unverified login session.', signOutError);
+                    throw profileError;
                 }
-
-                const profile = await window.TalalaBackend.getProfile();
 
                 const isOwner = profile?.role === 'owner';
                 const teacherHasPermission = Array.isArray(profile?.permissions)

@@ -27,42 +27,16 @@
             if (userError) throw userError;
             if (!userData.user) return null;
 
-            const isPlatformOwner = userData.user.email?.trim().toLowerCase() === 'brraa.20@gmail.com';
-            const ownerProfile = {
-                id: userData.user.id,
-                email: userData.user.email,
-                display_name: 'مالك المنصة',
-                role: 'owner',
-                active: true,
-                invitation_accepted: true,
-                permissions: ['reports', 'analytics', 'questions', 'interventions', 'support'],
-                school_name: '',
-                assigned_grades: [],
-                assigned_subjects: []
-            };
-
-            if (isPlatformOwner) {
-                try {
-                    await check(supabase.rpc('ensure_platform_owner_profile'));
-                } catch (error) {
-                    console.error('Unable to initialize the platform owner profile.', error);
-                }
+            if (userData.user.email?.trim().toLowerCase() === 'brraa.20@gmail.com') {
+                await check(supabase.rpc('ensure_platform_owner_profile'));
             }
 
-            const { data: profile, error: profileError } = await supabase
+            const profile = await check(supabase
                 .from('profiles')
                 .select('id, email, display_name, role, active, invitation_accepted, permissions, school_name, assigned_grades, assigned_subjects')
                 .eq('id', userData.user.id)
-                .maybeSingle();
-            if (profileError) {
-                if (!isPlatformOwner) throw profileError;
-                console.error('Unable to load the platform owner profile; using owner defaults.', profileError);
-                return ownerProfile;
-            }
-            if (!profile) return isPlatformOwner ? ownerProfile : null;
-            return isPlatformOwner
-                ? { ...profile, ...ownerProfile }
-                : { ...profile, email: userData.user.email };
+                .maybeSingle());
+            return profile ? { ...profile, email: userData.user.email } : null;
         },
 
         async loadContent(contentKey) {
