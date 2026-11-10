@@ -25,7 +25,7 @@
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">دخول المعلم/ة</h1>
             <form id="teacher-login-form">
-                <label for="username">اسم المستخدم (البريد الإلكتروني) <span class="required-mark" aria-hidden="true">*</span></label>
+                <label for="username">البريد الإلكتروني المستخدم للتسجيل <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="username" name="username" type="email" autocomplete="username" required>
                 <label for="password">كلمة المرور <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
@@ -44,21 +44,13 @@
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
         const submitButton = form.querySelector('button[type="submit"]');
-        const oauthRedirect = new URLSearchParams(window.location.search).get('redirect');
 
-        function getOAuthReturnUrl() {
-            if (!oauthRedirect) return null;
-            try {
-                const target = new URL(oauthRedirect, window.location.href);
-                const consentPath = new URL('oauth/consent/', window.location.href).pathname;
-                if (target.origin !== window.location.origin || target.pathname !== consentPath) return null;
-                if (!target.searchParams.has('authorization_id') && target.searchParams.get('mode') !== 'login') return null;
-                return target.href;
-            } catch (redirectError) {
-                console.error('Ignoring an invalid post-login redirect.', redirectError);
-                return null;
-            }
+        function errorCode(error) {
+            return typeof error?.code === 'string' && /^[a-z0-9_-]+$/i.test(error.code)
+                ? error.code
+                : '';
         }
+
         if (!window.TalalaBackend.isConfigured) {
             error.textContent = 'تعذر تسجيل الدخول حاليًا. يرجى المحاولة لاحقًا.';
             submitButton.disabled = true;
@@ -74,7 +66,18 @@
                     email: username.value.trim(),
                     password: password.value
                 });
-                if (signInError) throw signInError;
+                if (signInError) {
+                    console.error('Password authentication failed.', signInError);
+                    if (signInError.code === 'invalid_credentials') {
+                        error.textContent = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+                    } else if (signInError.code === 'email_not_confirmed') {
+                        error.textContent = 'يجب تأكيد البريد الإلكتروني قبل تسجيل الدخول.';
+                    } else {
+                        const code = errorCode(signInError);
+                        error.textContent = `تعذر إكمال تسجيل الدخول بسبب مشكلة في خدمة المصادقة.${code ? ` رمز الخطأ: ${code}.` : ''}`;
+                    }
+                    return;
+                }
 
                 let profile;
                 try {
@@ -82,7 +85,10 @@
                 } catch (profileError) {
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to clear an unverified login session.', signOutError);
-                    throw profileError;
+                    console.error('Password authentication succeeded, but profile lookup failed.', profileError);
+                    const code = errorCode(profileError);
+                    error.textContent = `تم التحقق من كلمة المرور، لكن تعذر تحميل صلاحيات الحساب. لم يكتمل الدخول.${code ? ` رمز الخطأ: ${code}.` : ''}`;
+                    return;
                 }
 
                 const isOwner = profile?.role === 'owner';
@@ -97,12 +103,14 @@
                 if (!allowed) {
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
-                    throw new Error('Unauthorized account.');
+                    error.textContent = 'تم التحقق من كلمة المرور، لكن الحساب غير مفعّل أو لا يملك صلاحية دخول بوابة المعلم/ة. تواصل مع مسؤول المنصة.';
+                    return;
                 }
-                window.location.replace(getOAuthReturnUrl() || 'question-manager.html');
-            } catch (signInError) {
-                console.error('Unable to sign in.', signInError);
-                error.textContent = 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مجددًا.';
+                window.location.replace('question-manager.html');
+            } catch (requestError) {
+                console.error('Unable to complete password sign-in.', requestError);
+                const code = errorCode(requestError);
+                error.textContent = `تعذر الاتصال بخدمة تسجيل الدخول. تحقق من اتصالك وحاول مجددًا.${code ? ` رمز الخطأ: ${code}.` : ''}`;
             } finally {
                 submitButton.disabled = !window.TalalaBackend.isConfigured;
             }
