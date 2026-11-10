@@ -51,6 +51,23 @@
                 : '';
         }
 
+        function getAccessDenialReason(profile) {
+            if (!profile) return 'لم يُعثر على ملف صلاحيات مرتبط بحساب الدخول.';
+            if (profile.active !== true) return 'حالة الحساب في ملف الصلاحيات ليست مفعّلة.';
+            if (!['owner', 'teacher', 'school_manager'].includes(profile.role)) {
+                return `الدور المسجل (${profile.role || 'غير محدد'}) لا يملك دخول البوابة.`;
+            }
+            if (profile.role === 'owner') return 'تعذر التحقق من صلاحية المالك؛ راجع مسؤول المنصة.';
+            if (profile.invitation_accepted !== true) return 'لم تُقبل دعوة هذا الحساب بعد.';
+            const hasTeacherPermission = Array.isArray(profile.permissions)
+                && ['reports', 'analytics', 'questions', 'interventions', 'support']
+                    .some((permission) => profile.permissions.includes(permission));
+            if (!hasTeacherPermission && !profile.permissions?.includes('manage_teachers')) {
+                return 'لا توجد صلاحية بوابة مناسبة في ملف هذا الحساب.';
+            }
+            return 'تعذر التحقق من صلاحية الحساب؛ حاول مجددًا أو تواصل مع مسؤول المنصة.';
+        }
+
         if (!window.TalalaBackend.isConfigured) {
             error.textContent = 'تعذر تسجيل الدخول حاليًا. يرجى المحاولة لاحقًا.';
             submitButton.disabled = true;
@@ -101,9 +118,16 @@
                     && (isOwner || profile.invitation_accepted === true)
                     && (isOwner || teacherHasPermission || profile.permissions?.includes('manage_teachers'));
                 if (!allowed) {
+                    const denialReason = getAccessDenialReason(profile);
+                    console.error('Profile failed teacher portal access checks.', {
+                        role: profile?.role ?? null,
+                        active: profile?.active ?? null,
+                        invitationAccepted: profile?.invitation_accepted ?? null,
+                        permissions: Array.isArray(profile?.permissions) ? profile.permissions : null
+                    });
                     const { error: signOutError } = await supabase.auth.signOut();
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
-                    error.textContent = 'تم التحقق من كلمة المرور، لكن الحساب غير مفعّل أو لا يملك صلاحية دخول بوابة المعلم/ة. تواصل مع مسؤول المنصة.';
+                    error.textContent = `تم التحقق من كلمة المرور، لكن ${denialReason}`;
                     return;
                 }
                 window.location.replace('question-manager.html');
