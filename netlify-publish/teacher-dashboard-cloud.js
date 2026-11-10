@@ -138,7 +138,7 @@ function renderAnalytics(summary = null) {
         ? summary.weak_skills.map(({ skill, count }) => [skill, count])
         : (() => {
             const frequency = {};
-            reports.forEach((report) => report.weak_skills.forEach((skill) => {
+            reports.forEach((report) => (Array.isArray(report.weak_skills) ? report.weak_skills : []).forEach((skill) => {
                 frequency[skill] = (frequency[skill] || 0) + 1;
             }));
             return Object.entries(frequency);
@@ -374,8 +374,8 @@ async function initialize() {
                     percent: attempt.percent,
                     diagnostic_percent: attempt.diagnostic_percent,
                     progress: attempt.progress,
-                    weak_skills: attempt.weak_skills,
-                    process_steps: attempt.process_steps || [],
+                    weak_skills: Array.isArray(attempt.weak_skills) ? attempt.weak_skills : [],
+                    process_steps: Array.isArray(attempt.process_steps) ? attempt.process_steps : [],
                     date: attempt.created_at.slice(0, 10)
                 });
             }
@@ -473,8 +473,8 @@ document.querySelector('#student-report-list').addEventListener('click', async (
                     percent: attempt.percent,
                     diagnostic_percent: attempt.diagnostic_percent,
                     progress: attempt.progress,
-                    weak_skills: attempt.weak_skills,
-                    process_steps: attempt.process_steps || [],
+                    weak_skills: Array.isArray(attempt.weak_skills) ? attempt.weak_skills : [],
+                    process_steps: Array.isArray(attempt.process_steps) ? attempt.process_steps : [],
                     date: attempt.created_at.slice(0, 10)
                 });
             }
