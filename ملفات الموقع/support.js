@@ -47,7 +47,7 @@ form.addEventListener('submit', async (event) => {
 
 async function trackTicket(ticketNumber) {
     const code = ticketNumber.trim().toUpperCase().replace(/^TL-/, '');
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(code)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
         showSupportMessage(trackResult, 'أدخل رقم التذكرة كاملًا كما ظهر عند الإرسال.', true);
         return;
     }

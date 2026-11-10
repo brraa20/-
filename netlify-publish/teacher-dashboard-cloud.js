@@ -277,6 +277,7 @@ function updateTeacherInvitationForm() {
             : field.value !== 'manage_teachers' && profile.permissions.includes(field.value);
         const option = field.closest('label');
         option.hidden = !allowed;
+        option.classList.toggle('hidden', !allowed);
         option.style.display = allowed ? '' : 'none';
         field.disabled = !allowed;
         if (!allowed) field.checked = false;
