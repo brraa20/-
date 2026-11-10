@@ -25,7 +25,7 @@
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">دخول المعلم/ة</h1>
             <form id="teacher-login-form">
-                <label for="username">البريد الإلكتروني <span class="required-mark" aria-hidden="true">*</span></label>
+                <label for="username">اسم المستخدم (البريد الإلكتروني) <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="username" name="username" type="email" autocomplete="username" required>
                 <label for="password">كلمة المرور <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
@@ -44,6 +44,21 @@
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
         const submitButton = form.querySelector('button[type="submit"]');
+        const oauthRedirect = new URLSearchParams(window.location.search).get('redirect');
+
+        function getOAuthReturnUrl() {
+            if (!oauthRedirect) return null;
+            try {
+                const target = new URL(oauthRedirect, window.location.href);
+                const consentPath = new URL('oauth/consent/', window.location.href).pathname;
+                if (target.origin !== window.location.origin || target.pathname !== consentPath) return null;
+                if (!target.searchParams.has('authorization_id') && target.searchParams.get('mode') !== 'login') return null;
+                return target.href;
+            } catch (redirectError) {
+                console.error('Ignoring an invalid post-login redirect.', redirectError);
+                return null;
+            }
+        }
         if (!window.TalalaBackend.isConfigured) {
             error.textContent = 'تعذر تسجيل الدخول حاليًا. يرجى المحاولة لاحقًا.';
             submitButton.disabled = true;
@@ -84,7 +99,7 @@
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
                     throw new Error('Unauthorized account.');
                 }
-                window.location.replace('question-manager.html');
+                window.location.replace(getOAuthReturnUrl() || 'question-manager.html');
             } catch (signInError) {
                 console.error('Unable to sign in.', signInError);
                 error.textContent = 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مجددًا.';

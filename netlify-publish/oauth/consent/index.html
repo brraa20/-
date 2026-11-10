@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#176b45">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <link rel="icon" href="../../logo/talala-logo.svg" type="image/svg+xml">
+    <title>موافقة التفويض | منصة طلاقة</title>
+    <link rel="stylesheet" href="../../ملفات الموقع/styles.css">
+    <link rel="stylesheet" href="../../ملفات الموقع/theme.css">
+    <style>
+        #authorization-details[hidden],
+        #consent-actions[hidden],
+        #return-to-login[hidden] {
+            display: none !important;
+        }
+
+        #requested-scopes {
+            padding-inline-start: 24px;
+            line-height: 1.8;
+        }
+
+        .consent-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="../../index.html">
+            <img src="../../logo/talala-logo.svg" alt="">
+            <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">بوابة المعلم/ة</span></span>
+        </a>
+        <nav aria-label="التنقل الرئيسي">
+            <ul><li><a href="../../index.html">الرئيسية</a></li></ul>
+        </nav>
+    </header>
+    <main class="login-shell">
+        <section class="login-card" aria-labelledby="consent-title">
+            <h1 id="consent-title">موافقة التفويض</h1>
+            <p id="consent-status" role="status" aria-live="polite">جارٍ التحقق من الحساب وطلب التفويض...</p>
+            <section id="authorization-details" hidden>
+                <p id="client-request"></p>
+                <p><strong>عنوان إعادة التوجيه:</strong> <span id="redirect-uri"></span></p>
+                <div>
+                    <strong>المعلومات المطلوبة:</strong>
+                    <ul id="requested-scopes"></ul>
+                </div>
+                <p class="local-storage-note">الموافقة تمنح التطبيق النطاقات المعروضة فقط. صلاحياته على بيانات المنصة تظل خاضعة لسياسات RLS، ولا تتم مشاركة كلمة مرورك.</p>
+                <div id="consent-actions" class="consent-actions" hidden>
+                    <button type="button" class="primary-button" id="approve-authorization">موافقة</button>
+                    <button type="button" class="secondary-button" id="deny-authorization">رفض</button>
+                </div>
+            </section>
+            <a id="return-to-login" class="secondary-button" href="../../teacher-login.html" hidden>العودة إلى تسجيل الدخول</a>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+    <script src="../../supabase/config.js"></script>
+    <script src="../../supabase/client.js"></script>
+    <script>
+        const status = document.querySelector('#consent-status');
+        const detailsPanel = document.querySelector('#authorization-details');
+        const clientRequest = document.querySelector('#client-request');
+        const redirectUri = document.querySelector('#redirect-uri');
+        const scopesList = document.querySelector('#requested-scopes');
+        const actions = document.querySelector('#consent-actions');
+        const approveButton = document.querySelector('#approve-authorization');
+        const denyButton = document.querySelector('#deny-authorization');
+        const returnLink = document.querySelector('#return-to-login');
+        const query = new URLSearchParams(window.location.search);
+        const authorizationId = query.get('authorization_id');
+        const mode = query.get('mode');
+        const callbackError = query.get('error_description')
+            || query.get('error')
+            || new URLSearchParams(window.location.hash.slice(1)).get('error')
+            || new URLSearchParams(window.location.hash.slice(1)).get('error_description');
+        const scopeDescriptions = {
+            openid: 'التحقق من هويتك وإصدار معرّف OpenID.',
+            email: 'قراءة عنوان بريدك الإلكتروني.',
+            profile: 'قراءة معلومات ملفك الشخصي الأساسية.',
+            phone: 'قراءة رقم هاتفك.'
+        };
+        let supabaseClient;
+        let busy = false;
+
+        function showError(message) {
+            status.textContent = message;
+            status.setAttribute('role', 'alert');
+            returnLink.hidden = false;
+        }
+
+        function loginUrl() {
+            const login = new URL('../../teacher-login.html', window.location.href);
+            login.searchParams.set('redirect', `${window.location.pathname}${window.location.search}`);
+            return login;
+        }
+
+        async function verifyAccount(profile) {
+            const isOwner = profile?.role === 'owner';
+            const hasTeacherPermission = Array.isArray(profile?.permissions)
+                && ['reports', 'analytics', 'questions', 'interventions', 'support']
+                    .some((permission) => profile.permissions.includes(permission));
+            const allowed = !!profile
+                && profile.active === true
+                && ['owner', 'teacher', 'school_manager'].includes(profile.role)
+                && (isOwner || profile.invitation_accepted === true)
+                && (isOwner || hasTeacherPermission || profile.permissions?.includes('manage_teachers'));
+            if (allowed) return;
+
+            const { error: signOutError } = await supabaseClient.auth.signOut();
+            if (signOutError) console.error('Unable to sign out an unauthorized OAuth user.', signOutError);
+            throw new Error('الحساب غير مفعّل أو لم تُمنح له صلاحيات الدخول. اطلب من مالك المنصة تفعيل الحساب وتحديد صلاحياته.');
+        }
+
+        function displayAuthorization(authDetails) {
+            clientRequest.textContent = `${authDetails.client?.name || 'تطبيق غير معروف'} يطلب الوصول إلى حسابك.`;
+            redirectUri.textContent = authDetails.redirect_uri || 'غير متاح';
+            const scopes = typeof authDetails.scope === 'string'
+                ? authDetails.scope.split(/\s+/).filter(Boolean)
+                : [];
+            scopesList.replaceChildren();
+            (scopes.length ? scopes : ['لا توجد نطاقات إضافية محددة']).forEach((scope) => {
+                const item = document.createElement('li');
+                item.textContent = scopeDescriptions[scope] || scope;
+                scopesList.append(item);
+            });
+            detailsPanel.hidden = false;
+            actions.hidden = false;
+            status.textContent = 'راجع اسم التطبيق والمعلومات المطلوبة، ثم اختر الموافقة أو الرفض.';
+        }
+
+        async function loadConsent() {
+            if (!window.TalalaBackend.isConfigured) {
+                throw new Error(window.TalalaBackend.configurationMessage);
+            }
+            if (!authorizationId && mode !== 'login') {
+                throw new Error('طلب التفويض غير مكتمل: لم يصل authorization_id.');
+            }
+            if (callbackError) {
+                throw new Error('تعذر إكمال تسجيل الدخول. ارجع إلى صفحة الدخول وحاول مجددًا.');
+            }
+
+            supabaseClient = window.TalalaBackend.requireClient();
+            const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!sessionData.session) {
+                window.location.replace(loginUrl().href);
+                return;
+            }
+
+            let profile;
+            try {
+                profile = await window.TalalaBackend.getProfile();
+            } catch (profileError) {
+                const { error: signOutError } = await supabaseClient.auth.signOut();
+                if (signOutError) console.error('Unable to clear an unverified OAuth session.', signOutError);
+                throw profileError;
+            }
+            await verifyAccount(profile);
+
+            if (!authorizationId && mode === 'login') {
+                window.location.replace('../../question-manager.html');
+                return;
+            }
+            const { data: authorization, error: authorizationError } =
+                await supabaseClient.auth.oauth.getAuthorizationDetails(authorizationId);
+            if (authorizationError) throw authorizationError;
+            if (authorization?.redirect_url && !authorization.authorization_id) {
+                window.location.replace(authorization.redirect_url);
+                return;
+            }
+            if (!authorization?.authorization_id) {
+                throw new Error('تعذر العثور على طلب التفويض أو أنه انتهت صلاحيته.');
+            }
+
+            displayAuthorization(authorization);
+        }
+
+        async function decideAuthorization(decision) {
+            if (busy || !authorizationId) return;
+            busy = true;
+            approveButton.disabled = true;
+            denyButton.disabled = true;
+            status.textContent = decision === 'approve' ? 'جارٍ اعتماد التفويض...' : 'جارٍ رفض التفويض...';
+            status.setAttribute('role', 'status');
+            try {
+                const result = decision === 'approve'
+                    ? await supabaseClient.auth.oauth.approveAuthorization(authorizationId)
+                    : await supabaseClient.auth.oauth.denyAuthorization(authorizationId);
+                if (result.error) throw result.error;
+                if (!result.data?.redirect_url) throw new Error('لم يُرجع Supabase عنوان متابعة صالحًا.');
+                window.location.assign(result.data.redirect_url);
+            } catch (error) {
+                console.error('Unable to process the OAuth authorization decision.', error);
+                status.textContent = `تعذر ${decision === 'approve' ? 'اعتماد' : 'رفض'} التفويض: ${error.message}`;
+                status.setAttribute('role', 'alert');
+                approveButton.disabled = false;
+                denyButton.disabled = false;
+                busy = false;
+            }
+        }
+
+        approveButton.addEventListener('click', () => decideAuthorization('approve'));
+        denyButton.addEventListener('click', () => decideAuthorization('deny'));
+
+        loadConsent().catch((error) => {
+            console.error('Unable to load the OAuth consent request.', error);
+            showError(error.message);
+        });
+    </script>
+</body>
+</html>

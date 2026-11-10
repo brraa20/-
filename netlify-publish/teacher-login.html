@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#176b45">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
-    <link rel="icon" href="talala-logo.svg" type="image/svg+xml">
+    <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
     <title>دخول المعلم/ة | منصة طلاقة</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="assessment.css">
-    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="ملفات الموقع/styles.css">
+    <link rel="stylesheet" href="ملفات الموقع/assessment.css">
+    <link rel="stylesheet" href="ملفات الموقع/theme.css">
 </head>
 <body>
     <header class="site-header">
         <a class="brand" href="index.html">
-            <img src="talala-logo.svg" alt="">
+            <img src="logo/talala-logo.svg" alt="">
             <span class="brand-name"><span class="brand-title">منصة طلاقة</span><span class="brand-badge">بوابة المعلم/ة</span></span>
         </a>
         <nav aria-label="التنقل الرئيسي">
@@ -25,7 +25,7 @@
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">دخول المعلم/ة</h1>
             <form id="teacher-login-form">
-                <label for="username">البريد الإلكتروني <span class="required-mark" aria-hidden="true">*</span></label>
+                <label for="username">اسم المستخدم (البريد الإلكتروني) <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="username" name="username" type="email" autocomplete="username" required>
                 <label for="password">كلمة المرور <span class="required-mark" aria-hidden="true">*</span></label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
@@ -44,6 +44,21 @@
         const username = document.querySelector('#username');
         const password = document.querySelector('#password');
         const submitButton = form.querySelector('button[type="submit"]');
+        const oauthRedirect = new URLSearchParams(window.location.search).get('redirect');
+
+        function getOAuthReturnUrl() {
+            if (!oauthRedirect) return null;
+            try {
+                const target = new URL(oauthRedirect, window.location.href);
+                const consentPath = new URL('oauth/consent/', window.location.href).pathname;
+                if (target.origin !== window.location.origin || target.pathname !== consentPath) return null;
+                if (!target.searchParams.has('authorization_id') && target.searchParams.get('mode') !== 'login') return null;
+                return target.href;
+            } catch (redirectError) {
+                console.error('Ignoring an invalid post-login redirect.', redirectError);
+                return null;
+            }
+        }
         if (!window.TalalaBackend.isConfigured) {
             error.textContent = 'تعذر تسجيل الدخول حاليًا. يرجى المحاولة لاحقًا.';
             submitButton.disabled = true;
@@ -84,7 +99,7 @@
                     if (signOutError) console.error('Unable to sign out an unauthorized account.', signOutError);
                     throw new Error('Unauthorized account.');
                 }
-                window.location.replace('question-manager.html');
+                window.location.replace(getOAuthReturnUrl() || 'question-manager.html');
             } catch (signInError) {
                 console.error('Unable to sign in.', signInError);
                 error.textContent = 'تعذر تسجيل الدخول. تحقق من بياناتك وحاول مجددًا.';
