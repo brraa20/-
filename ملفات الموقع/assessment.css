@@ -54,6 +54,16 @@
     transition: width 240ms ease;
 }
 
+.progress-save-status {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.progress-save-status.error {
+    color: #9b302d;
+}
+
 .question-card,
 .intervention-card,
 .results-card {

@@ -25,10 +25,137 @@ const state = {
     interventionQuestions: [],
     interventionAnswers: [],
     interventionHistory: [],
-    processSteps: []
+    processSteps: [],
+    sessionId: createProgressSessionId(),
+    startedAt: null,
+    trainedSeconds: 0,
+    lastActivityAt: null,
+    lastTickAt: null
 };
 
 const masteryThreshold = 80;
+const progressSaveStatus = document.querySelector('#progress-save-status');
+let progressSaveTimer;
+let progressSaveChain = Promise.resolve();
+
+function updateActiveTrainingTime(now = Date.now()) {
+    if (state.startedAt === null) return;
+    if (
+        document.visibilityState !== 'hidden'
+        && state.lastActivityAt !== null
+        && now - state.lastActivityAt <= 120000
+    ) {
+        state.trainedSeconds += Math.max(0, Math.floor((now - (state.lastTickAt ?? now)) / 1000));
+    }
+    state.lastTickAt = now;
+}
+
+function createProgressSessionId() {
+    if (typeof window.crypto?.randomUUID === 'function') return window.crypto.randomUUID();
+    if (typeof window.crypto?.getRandomValues !== 'function') return null;
+    const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function markAssessmentActivity() {
+    const now = Date.now();
+    updateActiveTrainingTime(now);
+    state.lastActivityAt = now;
+}
+
+function progressSnapshot(completed = false) {
+    updateActiveTrainingTime();
+    const stage = state.stage === 'results' ? 'final' : state.stage;
+    const stageLabels = {
+        diagnostic: 'الاختبار التشخيصي',
+        intervention: 'التدخل والشرح',
+        reassessment: 'إعادة التقييم',
+        interventionOutcome: 'نتائج إعادة التقييم',
+        final: 'الاختبار الشامل'
+    };
+    const questions = getQuestions();
+    const answers = getAnswers();
+    const answeredCount = answers.filter((answer) => answer !== undefined).length;
+    const totalQuestions = questions.length;
+
+    return {
+        session_id: state.sessionId,
+        student_name: studentName,
+        grade: studentGrade,
+        stage,
+        stage_label: completed ? 'اكتمل الاختبار' : stageLabels[stage],
+        progress_percent: completed
+            ? 100
+            : totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0,
+        current_question: totalQuestions ? Math.min(state.index + 1, totalQuestions) : 0,
+        total_questions: totalQuestions,
+        trained_seconds: Math.min(state.trainedSeconds, 28800),
+        process_steps: state.processSteps,
+        started_at: new Date(state.startedAt).toISOString(),
+        completed
+    };
+}
+
+function persistAssessmentProgress(completed = false) {
+    if (!window.TalalaBackend?.isConfigured || !state.sessionId || state.startedAt === null) {
+        return Promise.resolve();
+    }
+    clearTimeout(progressSaveTimer);
+    const snapshot = progressSnapshot(completed);
+    progressSaveChain = progressSaveChain
+        .catch(() => {})
+        .then(() => window.TalalaBackend.saveProgress(snapshot))
+        .then(() => {
+            progressSaveStatus.textContent = completed
+                ? 'اكتمل الاختبار وحُفظت النتيجة.'
+                : 'يُحفظ تقدمك تلقائيًا ليظهر للمعلم/ة.';
+            progressSaveStatus.classList.remove('error');
+        })
+        .catch((error) => {
+            console.error('Unable to save student assessment progress.', error);
+            progressSaveStatus.textContent = `تعذر حفظ التقدم في تقارير المعلم/ة: ${error.message}`;
+            progressSaveStatus.classList.add('error');
+            throw error;
+        });
+    return progressSaveChain;
+}
+
+function scheduleProgressSave(immediate = false) {
+    if (!window.TalalaBackend?.isConfigured || state.startedAt === null || state.stage === 'results') return;
+    clearTimeout(progressSaveTimer);
+    if (immediate) {
+        void persistAssessmentProgress().catch(() => {});
+        return;
+    }
+    progressSaveTimer = setTimeout(() => {
+        void persistAssessmentProgress().catch(() => {});
+    }, 750);
+}
+
+function startProgressTracking() {
+    if (window.TalalaBackend?.isConfigured && !state.sessionId) {
+        progressSaveStatus.textContent = 'تعذر إنشاء معرّف آمن لحفظ التقدم. أعد فتح الاختبار في متصفح حديث.';
+        progressSaveStatus.classList.add('error');
+        return;
+    }
+    state.startedAt = Date.now();
+    state.lastActivityAt = state.startedAt;
+    state.lastTickAt = state.startedAt;
+    ['pointerdown', 'keydown', 'touchstart'].forEach((eventName) => {
+        document.addEventListener(eventName, markAssessmentActivity, { passive: true });
+    });
+    document.addEventListener('visibilitychange', () => {
+        updateActiveTrainingTime();
+        if (document.visibilityState !== 'hidden') markAssessmentActivity();
+    });
+    window.setInterval(() => {
+        updateActiveTrainingTime();
+        scheduleProgressSave(true);
+    }, 15000);
+}
 
 const titles = {
     diagnostic: 'الاختبار التشخيصي',
@@ -148,6 +275,7 @@ function renderQuestion() {
             : state.stage === 'reassessment' ? 'تسليم إعادة التقييم' : 'تسليم الاختبار الشامل'
         : 'السؤال التالي';
     progress();
+    scheduleProgressSave();
 }
 
 function calculateResults(questions, answers, skillIds = data.skills.map((skill) => skill.id)) {
@@ -245,6 +373,7 @@ async function initializeAssessment() {
         nextButton.hidden = true;
         return;
     }
+    startProgressTracking();
     renderQuestion();
 }
 
@@ -318,6 +447,7 @@ function renderIntervention() {
 
     nextButton.disabled = false;
     nextButton.textContent = weakSkills.length ? 'ابدأ إعادة تقييم المهارات' : 'ابدأ الاختبار الشامل';
+    scheduleProgressSave(true);
 }
 
 function startInterventionAssessment() {
@@ -415,6 +545,7 @@ function renderInterventionOutcome() {
     nextButton.textContent = remainingSkills.length
         ? 'كرّر العلاج للمهارات غير المتقنة'
         : 'انتقل إلى الاختبار الشامل';
+    scheduleProgressSave(true);
 }
 
 function buildFinalQuestions() {
@@ -565,6 +696,7 @@ function renderResults() {
 }
 
 async function saveStudentReport(diagnosticResults, finalResults) {
+    updateActiveTrainingTime();
     const diagnosticTotal = diagnosticResults.reduce((total, result) => total + result.total, 0);
     const diagnosticCorrect = diagnosticResults.reduce((total, result) => total + result.correct, 0);
     const finalTotal = finalResults.reduce((total, result) => total + result.total, 0);
@@ -583,10 +715,16 @@ async function saveStudentReport(diagnosticResults, finalResults) {
         weak_skills: weakSkills,
         diagnostic_results: diagnosticResults,
         final_results: finalResults,
-        process_steps: state.processSteps
+        process_steps: state.processSteps,
+        duration_seconds: Math.min(state.trainedSeconds, 28800)
     };
     if (window.TalalaBackend?.isConfigured) {
         await window.TalalaBackend.saveAttempt(report);
+        try {
+            await persistAssessmentProgress(true);
+        } catch {
+            progressSaveStatus.textContent = 'حُفظت النتيجة، لكن تعذر إغلاق سجل التقدم الجاري.';
+        }
         return;
     }
 
@@ -603,7 +741,8 @@ async function saveStudentReport(diagnosticResults, finalResults) {
         progress: report.progress,
         date: new Date().toISOString().slice(0, 10),
         weakSkills: weakSkills,
-        processSteps: state.processSteps
+        processSteps: state.processSteps,
+        durationSeconds: report.duration_seconds
     };
     if (existingIndex >= 0) reports.splice(existingIndex, 1);
     reports.unshift(localReport);

@@ -75,13 +75,41 @@
             await check(supabase.from('assessment_attempts').insert(attempt));
         },
 
+        async saveProgress(progress) {
+            const supabase = this.requireClient();
+            await check(supabase.rpc('save_student_assessment_progress', {
+                p_session_id: progress.session_id,
+                p_student_name: progress.student_name,
+                p_grade: progress.grade,
+                p_stage: progress.stage,
+                p_stage_label: progress.stage_label,
+                p_progress_percent: progress.progress_percent,
+                p_current_question: progress.current_question,
+                p_total_questions: progress.total_questions,
+                p_trained_seconds: progress.trained_seconds,
+                p_process_steps: progress.process_steps,
+                p_started_at: progress.started_at,
+                p_completed: progress.completed
+            }));
+        },
+
         async loadAttempts() {
             const supabase = this.requireClient();
             return await check(supabase
                 .from('assessment_attempts')
-                .select('id, student_name, grade, percent, diagnostic_percent, progress, weak_skills, process_steps, created_at')
+                .select('id, student_name, grade, percent, diagnostic_percent, progress, weak_skills, process_steps, duration_seconds, created_at')
                 .order('created_at', { ascending: false })
                 .limit(5000));
+        },
+
+        async loadStudentProgress() {
+            const supabase = this.requireClient();
+            const recentCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            return await check(supabase
+                .from('student_assessment_progress')
+                .select('session_id, student_name, grade, stage, stage_label, progress_percent, current_question, total_questions, trained_seconds, process_steps, started_at, updated_at')
+                .gte('updated_at', recentCutoff)
+                .order('updated_at', { ascending: false }));
         },
 
         async loadAnalyticsSummary() {

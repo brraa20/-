@@ -105,27 +105,109 @@ function renderReports() {
         ? filtered.map((report) => `
             <tr>
                 <td>${escapeHtml(report.student_name)}</td><td>${escapeHtml(report.grade)}</td>
-                <td>${report.attempts}</td><td>${report.percent}%</td>
-                <td>${escapeHtml(report.progress)}</td><td>${escapeHtml(report.date)}</td>
+                <td>${report.attempts}</td><td>${Number.isFinite(report.percent) ? `${report.percent}%` : '—'}</td>
+                <td>${report.in_progress
+                    ? `قيد التنفيذ • ${escapeHtml(report.stage_label)} (${report.progress_percent}%)${report.total_questions ? ` • السؤال ${report.current_question} من ${report.total_questions}` : ''}`
+                    : escapeHtml(report.progress)}</td>
+                <td>${escapeHtml(formatTrainingDuration(report.trained_seconds))}</td><td>${escapeHtml(report.date)}</td>
                 <td class="report-actions-cell">
-                    <button type="button" class="secondary-button" data-preview-report="${escapeHtml(report.id)}">معاينة وطباعة</button>
-                    <button type="button" class="danger-button" data-delete-report="${escapeHtml(report.id)}">حذف النتائج</button>
+                    <button type="button" class="secondary-button" data-preview-report="${escapeHtml(report.id || report.session_id)}">معاينة وطباعة</button>
+                    ${report.id ? `<button type="button" class="danger-button" data-delete-report="${escapeHtml(report.id)}">حذف النتائج</button>` : ''}
                 </td>
             </tr>`).join('')
-        : '<tr><td colspan="7" class="empty-state">لا توجد نتائج مطابقة.</td></tr>';
+        : '<tr><td colspan="8" class="empty-state">لا توجد نتائج مطابقة.</td></tr>';
+}
+
+function formatTrainingDuration(seconds) {
+    const safeSeconds = Math.max(0, Number(seconds) || 0);
+    if (safeSeconds < 60) return safeSeconds ? 'أقل من دقيقة' : 'غير مسجلة';
+    const minutes = Math.floor(safeSeconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours) return `${hours} ساعة${remainingMinutes ? ` و${remainingMinutes} دقيقة` : ''}`;
+    if (minutes === 1) return 'دقيقة واحدة';
+    if (minutes === 2) return 'دقيقتان';
+    return `${minutes} دقيقة`;
+}
+
+async function loadStudentReports() {
+    const [attempts, progressEntries] = await Promise.all([
+        backend.loadAttempts(),
+        backend.loadStudentProgress()
+    ]);
+    const grouped = new Map();
+    attempts.forEach((attempt) => {
+        const key = `${attempt.student_name}\u0000${attempt.grade}`;
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                id: attempt.id,
+                session_id: null,
+                student_name: attempt.student_name,
+                grade: attempt.grade,
+                attempts: 0,
+                percent: Number(attempt.percent),
+                diagnostic_percent: Number(attempt.diagnostic_percent),
+                progress: attempt.progress,
+                weak_skills: Array.isArray(attempt.weak_skills) ? attempt.weak_skills : [],
+                process_steps: Array.isArray(attempt.process_steps) ? attempt.process_steps : [],
+                trained_seconds: Number(attempt.duration_seconds) || 0,
+                current_stage: 'completed',
+                stage_label: 'اكتمل الاختبار',
+                progress_percent: 100,
+                current_question: 0,
+                total_questions: 0,
+                in_progress: false,
+                last_attempt_at: attempt.created_at,
+                date: attempt.created_at.slice(0, 10)
+            });
+        }
+        grouped.get(key).attempts += 1;
+    });
+
+    progressEntries.forEach((entry) => {
+        const key = `${entry.student_name}\u0000${entry.grade}`;
+        const report = grouped.get(key);
+        if (report && Date.parse(entry.updated_at) <= Date.parse(report.last_attempt_at)) return;
+        const latest = report || {
+            id: null,
+            attempts: 0,
+            diagnostic_percent: null,
+            weak_skills: [],
+            student_name: entry.student_name,
+            grade: entry.grade
+        };
+        Object.assign(latest, {
+            session_id: entry.session_id,
+            percent: null,
+            progress: 'قيد التنفيذ',
+            process_steps: Array.isArray(entry.process_steps) ? entry.process_steps : [],
+            trained_seconds: Number(entry.trained_seconds) || 0,
+            current_stage: entry.stage,
+            stage_label: entry.stage_label,
+            progress_percent: Number(entry.progress_percent) || 0,
+            current_question: Number(entry.current_question) || 0,
+            total_questions: Number(entry.total_questions) || 0,
+            in_progress: true,
+            last_attempt_at: entry.updated_at,
+            date: entry.updated_at.slice(0, 10)
+        });
+        grouped.set(key, latest);
+    });
+    return [...grouped.values()];
 }
 
 function renderAnalytics(summary = null) {
-    const studentCount = summary?.student_count ?? reports.length;
-    const average = summary?.average_percent ?? (reports.length
-        ? Math.round(reports.reduce((sum, report) => sum + report.percent, 0) / reports.length)
+    const completedReports = reports.filter((report) => !report.in_progress && Number.isFinite(report.percent));
+    const studentCount = summary?.student_count ?? completedReports.length;
+    const average = summary?.average_percent ?? (completedReports.length
+        ? Math.round(completedReports.reduce((sum, report) => sum + report.percent, 0) / completedReports.length)
         : 0);
-    const diagnosticAverage = summary?.diagnostic_average ?? (reports.length
-        ? Math.round(reports.reduce((sum, report) => sum + report.diagnostic_percent, 0) / reports.length)
+    const diagnosticAverage = summary?.diagnostic_average ?? (completedReports.length
+        ? Math.round(completedReports.reduce((sum, report) => sum + (Number(report.diagnostic_percent) || 0), 0) / completedReports.length)
         : 0);
-    const highest = summary?.highest_percent ?? (reports.length ? Math.max(...reports.map((report) => report.percent)) : 0);
+    const highest = summary?.highest_percent ?? (completedReports.length ? Math.max(...completedReports.map((report) => report.percent)) : 0);
     const totalAttempts = summary?.total_attempts
-        ?? reports.reduce((sum, report) => sum + report.attempts, 0);
+        ?? completedReports.reduce((sum, report) => sum + report.attempts, 0);
     document.querySelector('#analytics-metrics').innerHTML = `
         <article class="metric-card"><strong>${studentCount}</strong><span>عدد المختبرين</span></article>
         <article class="metric-card"><strong>${average}%</strong><span>المتوسط العام</span></article>
@@ -138,7 +220,7 @@ function renderAnalytics(summary = null) {
         ? summary.weak_skills.map(({ skill, count }) => [skill, count])
         : (() => {
             const frequency = {};
-            reports.forEach((report) => (Array.isArray(report.weak_skills) ? report.weak_skills : []).forEach((skill) => {
+            completedReports.forEach((report) => (Array.isArray(report.weak_skills) ? report.weak_skills : []).forEach((skill) => {
                 frequency[skill] = (frequency[skill] || 0) + 1;
             }));
             return Object.entries(frequency);
@@ -364,27 +446,7 @@ async function initialize() {
     renderInterventions();
 
     if (can('reports')) {
-        const attempts = await backend.loadAttempts();
-        const grouped = new Map();
-        attempts.forEach((attempt) => {
-            const key = `${attempt.student_name}\u0000${attempt.grade}`;
-            if (!grouped.has(key)) {
-                grouped.set(key, {
-                    id: attempt.id,
-                    student_name: attempt.student_name,
-                    grade: attempt.grade,
-                    attempts: 0,
-                    percent: attempt.percent,
-                    diagnostic_percent: attempt.diagnostic_percent,
-                    progress: attempt.progress,
-                    weak_skills: Array.isArray(attempt.weak_skills) ? attempt.weak_skills : [],
-                    process_steps: Array.isArray(attempt.process_steps) ? attempt.process_steps : [],
-                    date: attempt.created_at.slice(0, 10)
-                });
-            }
-            grouped.get(key).attempts += 1;
-        });
-        reports = [...grouped.values()];
+        reports = await loadStudentReports();
         const grades = [...new Set(reports.map((report) => report.grade))];
         const gradeFilter = document.querySelector('#grade-filter');
         grades.forEach((grade) => gradeFilter.add(new Option(grade, grade)));
@@ -418,13 +480,20 @@ document.querySelector('#student-search').addEventListener('input', renderReport
 document.querySelector('#grade-filter').addEventListener('change', renderReports);
 document.querySelector('#student-report-list').addEventListener('click', (event) => {
     const button = event.target.closest('[data-preview-report]');
-    const report = reports.find((item) => item.id === button?.dataset.previewReport);
+    const report = reports.find((item) =>
+        (item.id || item.session_id) === button?.dataset.previewReport);
     if (!report) return;
 
     const diagnosticPercent = Math.min(100, Math.max(0, Number(report.diagnostic_percent) || 0));
     const finalPercent = Math.min(100, Math.max(0, Number(report.percent) || 0));
     const weakSkills = Array.isArray(report.weak_skills) ? report.weak_skills : [];
     const steps = processStepsSummary(Array.isArray(report.process_steps) ? report.process_steps : []);
+    const trainingDuration = formatTrainingDuration(report.trained_seconds);
+    const stageProgress = report.in_progress
+        ? `${report.progress_percent}%${report.total_questions
+            ? ` — السؤال ${report.current_question} من ${report.total_questions}`
+            : ''}`
+        : 'اكتمل الاختبار';
     document.querySelector('#report-preview-content').innerHTML = `
         <header class="report-preview__identity">
             <p class="report-preview__eyebrow">منصة طلاقة • تقرير القراءة</p>
@@ -433,10 +502,18 @@ document.querySelector('#student-report-list').addEventListener('click', (event)
         </header>
         <section class="report-preview__metrics" aria-label="ملخص النتيجة">
             <article><span>عدد المحاولات</span><strong>${Number(report.attempts) || 0}</strong></article>
-            <article><span>النتيجة النهائية</span><strong>${finalPercent}%</strong></article>
-            <article><span>مستوى التقدم</span><strong>${escapeHtml(report.progress)}</strong></article>
+            <article><span>آخر نتيجة مكتملة</span><strong>${Number.isFinite(report.percent) ? `${finalPercent}%` : 'لا توجد بعد'}</strong></article>
+            <article><span>مدة التدريب</span><strong>${escapeHtml(trainingDuration)}</strong></article>
+            <article><span>حالة المحاولة</span><strong>${report.in_progress ? 'قيد التنفيذ' : 'مكتملة'}</strong></article>
         </section>
-        <section class="report-preview__chart" aria-labelledby="report-chart-title">
+        <section class="report-preview__progress" aria-label="تقدم الطالب/ة">
+            <h4>التقدم والمرحلة الحالية</h4>
+            <p><strong>آخر مرحلة:</strong> ${escapeHtml(report.stage_label || 'غير مسجلة')}</p>
+            <p><strong>التقدم في المرحلة:</strong> ${escapeHtml(stageProgress)}</p>
+            <p><strong>مدة التدريب النشط:</strong> ${escapeHtml(trainingDuration)}</p>
+            <div class="report-score__track" role="img" aria-label="التقدم في المرحلة ${report.in_progress ? report.progress_percent : 100}%"><i style="width:${report.in_progress ? report.progress_percent : 100}%"></i></div>
+        </section>
+        ${report.in_progress ? '' : `<section class="report-preview__chart" aria-labelledby="report-chart-title">
             <h4 id="report-chart-title">مقارنة نتيجة التشخيص والاختبار الشامل</h4>
             <div class="report-score">
                 <div><span>التشخيص</span><strong>${diagnosticPercent}%</strong></div>
@@ -446,7 +523,7 @@ document.querySelector('#student-report-list').addEventListener('click', (event)
                 <div><span>الاختبار الشامل</span><strong>${finalPercent}%</strong></div>
                 <div class="report-score__track" role="img" aria-label="نتيجة الاختبار الشامل ${finalPercent}%"><i style="width:${finalPercent}%"></i></div>
             </div>
-        </section>
+        </section>`}
         <section class="report-preview__skills">
             <h4>مهارات تحتاج إلى تعزيز</h4>
             <p>${weakSkills.length ? weakSkills.map(escapeHtml).join('، ') : 'لا توجد مهارات مسجلة تحتاج إلى تعزيز.'}</p>
@@ -463,27 +540,7 @@ document.querySelector('#student-report-list').addEventListener('click', async (
     if (!report || !confirm(`سيؤدي ذلك إلى حذف جميع نتائج ${report.student_name} في ${report.grade}. هل تريد المتابعة؟`)) return;
     try {
         await backend.deleteStudentAttempts(report.student_name, report.grade);
-        const attempts = await backend.loadAttempts();
-        const grouped = new Map();
-        attempts.forEach((attempt) => {
-            const key = `${attempt.student_name}\u0000${attempt.grade}`;
-            if (!grouped.has(key)) {
-                grouped.set(key, {
-                    id: attempt.id,
-                    student_name: attempt.student_name,
-                    grade: attempt.grade,
-                    attempts: 0,
-                    percent: attempt.percent,
-                    diagnostic_percent: attempt.diagnostic_percent,
-                    progress: attempt.progress,
-                    weak_skills: Array.isArray(attempt.weak_skills) ? attempt.weak_skills : [],
-                    process_steps: Array.isArray(attempt.process_steps) ? attempt.process_steps : [],
-                    date: attempt.created_at.slice(0, 10)
-                });
-            }
-            grouped.get(key).attempts += 1;
-        });
-        reports = [...grouped.values()];
+        reports = await loadStudentReports();
         renderReports();
         renderAnalytics();
         showStatus('حُذفت جميع نتائج الطالب/ة من قاعدة البيانات.');

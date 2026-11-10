@@ -235,12 +235,23 @@
 
 .report-preview__metrics article,
 .report-preview__chart,
+.report-preview__progress,
 .report-preview__skills,
 .report-preview__steps {
     padding: 16px;
     border: 1px solid var(--line);
     border-radius: 11px;
     background: #fff;
+}
+
+.report-preview__progress p {
+    margin-block: 8px;
+    color: var(--ink);
+    font-size: 0.86rem;
+}
+
+.report-preview__progress .report-score__track {
+    margin-top: 12px;
 }
 
 .report-preview__metrics span,
@@ -400,6 +411,7 @@
     .report-preview__identity,
     .report-preview__metrics article,
     .report-preview__chart,
+    .report-preview__progress,
     .report-preview__skills,
     .report-preview__steps {
         break-inside: avoid;
