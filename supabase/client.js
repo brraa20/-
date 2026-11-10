@@ -147,7 +147,22 @@
 
         async inviteTeacher(invitation) {
             const supabase = this.requireClient();
-            return await check(supabase.functions.invoke('create-teacher', { body: invitation }));
+            const { data, error } = await supabase.functions.invoke('create-teacher', { body: invitation });
+            if (!error) return data;
+
+            let message = error.message;
+            if (error.context instanceof Response) {
+                const responseText = await error.context.clone().text();
+                if (responseText) {
+                    try {
+                        const responseBody = JSON.parse(responseText);
+                        if (typeof responseBody.error === 'string') message = responseBody.error;
+                    } catch {
+                        message = `${message}: ${responseText.slice(0, 240)}`;
+                    }
+                }
+            }
+            throw new Error(message);
         }
     });
 })();

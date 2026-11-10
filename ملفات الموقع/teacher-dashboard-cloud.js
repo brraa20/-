@@ -246,7 +246,7 @@ function renderTeachers() {
             }</span>
             ${(['reports', 'analytics', 'questions', 'interventions', 'support', ...(profile.role === 'owner' || teacher.role === 'school_manager' ? ['manage_teachers'] : [])]
                 .filter((permission) => profile.role === 'owner' || (profile.permissions.includes(permission) && permission !== 'manage_teachers'))
-                .map((permission) => `<label${permission === 'manage_teachers' && teacher.role !== 'school_manager' ? ' class="hidden" style="display:none"' : ''}><input type="checkbox" data-edit-permission value="${permission}" ${teacher.permissions.includes(permission) ? 'checked' : ''} ${permission === 'manage_teachers' ? 'disabled' : profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}>${permissionLabels[permission]}</label>`).join(''))}</div>
+                .map((permission) => `<label${permission === 'manage_teachers' && teacher.role !== 'school_manager' ? ' class="hidden" style="display:none"' : ''}><input type="checkbox" data-edit-permission value="${permission}" ${teacher.permissions.includes(permission) ? 'checked' : ''} ${permission === 'manage_teachers' ? profile.role === 'owner' ? '' : 'disabled' : profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}>${permissionLabels[permission]}</label>`).join(''))}</div>
             <label>الصفوف المسندة<input type="text" data-edit-grades value="${escapeHtml((teacher.assigned_grades || []).join('، '))}" ${profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}></label>
             <label>المواد المسندة<input type="text" data-edit-subjects value="${escapeHtml((teacher.assigned_subjects || []).join('، '))}" ${profile.role === 'owner' || teacher.role === 'teacher' ? '' : 'disabled'}></label>
             ${profile.role === 'owner' ? `<label>المدرسة<input type="text" data-edit-school value="${escapeHtml(teacher.school_name || '')}"></label>` : ''}
@@ -262,6 +262,7 @@ function renderTeachers() {
 function updateTeacherInvitationForm() {
     const roleField = document.querySelector('#teacher-role');
     const schoolField = document.querySelector('#teacher-school');
+    const gradesField = document.querySelector('#teacher-grades');
     const isOwner = profile.role === 'owner';
 
     roleField.disabled = !isOwner;
@@ -277,12 +278,13 @@ function updateTeacherInvitationForm() {
         const option = field.closest('label');
         option.hidden = !allowed;
         option.style.display = allowed ? '' : 'none';
-        field.disabled = isOwner && roleField.value === 'school_manager' && field.value === 'manage_teachers';
+        field.disabled = !allowed;
         if (!allowed) field.checked = false;
-        if (isOwner && roleField.value === 'school_manager' && field.value === 'manage_teachers') {
-            field.checked = true;
-        }
     });
+    const needsGrades = ['reports', 'analytics'].some((permission) =>
+        document.querySelector(`#teacher-editor input[name="permission"][value="${permission}"]`).checked);
+    gradesField.required = needsGrades;
+    gradesField.setAttribute('aria-required', String(needsGrades));
 }
 
 function parseAssignmentList(value) {
@@ -635,6 +637,10 @@ document.querySelector('#teacher-editor').addEventListener('submit', async (even
     event.preventDefault();
     const permissions = [...document.querySelectorAll('input[name="permission"]:checked')]
         .map((field) => field.value);
+    if (permissions.length === 0) {
+        showStatus('اختر صلاحية واحدة على الأقل قبل إرسال الدعوة.', true);
+        return;
+    }
     try {
         const invitation = await backend.inviteTeacher({
             email: document.querySelector('#teacher-email').value.trim(),
@@ -659,6 +665,9 @@ document.querySelector('#teacher-editor').addEventListener('submit', async (even
 });
 
 document.querySelector('#teacher-role').addEventListener('change', updateTeacherInvitationForm);
+document.querySelectorAll('#teacher-editor input[name="permission"]').forEach((field) => {
+    field.addEventListener('change', updateTeacherInvitationForm);
+});
 
 document.querySelector('#teacher-list').addEventListener('click', async (event) => {
     const saveButton = event.target.closest('[data-save-teacher]');
@@ -743,8 +752,8 @@ document.querySelector('#teacher-list').addEventListener('change', (event) => {
     option.hidden = !isManager;
     option.classList.toggle('hidden', !isManager);
     option.style.display = isManager ? '' : 'none';
-    managePermission.checked = isManager;
-    managePermission.disabled = true;
+    if (!isManager) managePermission.checked = false;
+    managePermission.disabled = profile.role !== 'owner';
 });
 
 void initialize().catch((error) => {

@@ -108,6 +108,16 @@ Deno.serve(async (request) => {
   const grades = normalizeAssignments(input.grades);
   const subjects = normalizeAssignments(input.subjects);
   const permissions = input.permissions;
+  if (Array.isArray(permissions) && permissions.length === 0) {
+    return response({ error: "اختر صلاحية واحدة على الأقل قبل إرسال الدعوة." }, 400);
+  }
+  if (
+    Array.isArray(permissions) &&
+    permissions.some((permission) => ["reports", "analytics"].includes(permission)) &&
+    (!grades || grades.length === 0)
+  ) {
+    return response({ error: "أدخل صفًا واحدًا على الأقل عند تفعيل التقارير أو تحليلات المدرسة." }, 400);
+  }
   if (
     !email ||
     email.length > 254 ||
@@ -124,9 +134,7 @@ Deno.serve(async (request) => {
     permissions.length === 0 ||
     new Set(permissions).size !== permissions.length ||
     permissions.some((permission) => !allowedPermissions.has(permission)) ||
-    (role === "school_manager" && !permissions.includes("manage_teachers")) ||
-    (role === "teacher" && permissions.includes("manage_teachers")) ||
-    (permissions.some((permission) => ["reports", "analytics"].includes(permission)) && grades.length === 0)
+    (role === "teacher" && permissions.includes("manage_teachers"))
   ) {
     return response({ error: "Teacher details or permissions are invalid." }, 400);
   }

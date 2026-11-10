@@ -12,7 +12,7 @@ alter table public.profiles
     add constraint profiles_manager_permission_check
     check (
         role = 'owner'
-        or (role = 'school_manager' and 'manage_teachers' = any(permissions))
+        or role = 'school_manager'
         or (role = 'teacher' and not ('manage_teachers' = any(permissions)))
     );
 

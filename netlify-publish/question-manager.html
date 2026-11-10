@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#176b45">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
-    <link rel="icon" href="talala-logo.svg" type="image/svg+xml">
+    <link rel="icon" href="logo/talala-logo.svg" type="image/svg+xml">
     <title>لوحة المعلم/ة | منصة طلاقة</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="assessment.css">
-    <link rel="stylesheet" href="theme.css">
-    <link rel="stylesheet" href="teacher-dashboard.css">
-    <link rel="stylesheet" href="teacher-dashboard-polish.css">
+    <link rel="stylesheet" href="ملفات الموقع/styles.css">
+    <link rel="stylesheet" href="ملفات الموقع/assessment.css">
+    <link rel="stylesheet" href="ملفات الموقع/theme.css">
+    <link rel="stylesheet" href="ملفات الموقع/teacher-dashboard.css">
+    <link rel="stylesheet" href="ملفات الموقع/teacher-dashboard-polish.css">
 </head>
 <body>
     <main class="dashboard-shell">
@@ -80,11 +80,12 @@
                     <option value="school_manager">مدير/ة مدرسة</option>
                 </select>
                 <input id="teacher-school" placeholder="المدرسة" required>
-                <input id="teacher-grades" placeholder="أدخل الصفوف كما تظهر في التقارير (مطلوبة للتقارير والتحليلات)">
+                <input id="teacher-grades" placeholder="أدخل الصفوف كما تظهر في التقارير (مطلوبة عند تفعيل التقارير أو التحليلات)" aria-describedby="teacher-grades-help">
+                <small id="teacher-grades-help">تُطلب الصفوف عند اختيار التقارير أو تحليلات المدرسة.</small>
                 <input id="teacher-subjects" placeholder="المواد المسندة (افصل بينها بفاصلة)">
                 <p class="local-storage-note">ستُرسل الدعوة عبر Supabase. لا يُفعّل الحساب قبل قبول الدعوة وإنشاء كلمة المرور. تُقيّد التقارير بالصفوف المسندة، ويستطيع مدير المدرسة إدارة معلمي مدرسته فقط.</p>
                 <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label><label id="manage-teachers-option" class="hidden"><input type="checkbox" name="permission" value="manage_teachers"> إدارة معلمي المدرسة ودعوتهم</label></div>
-                <p class="local-storage-note">يمكن اختيار كل صلاحية بشكل مستقل. صلاحية إدارة المعلمين تظهر لمدير/ة المدرسة فقط، ولا تسمح بإنشاء مدير آخر. يجب أن تطابق الصفوف المسندة أسماء الصفوف الظاهرة في النتائج؛ وإلا فلن تظهر نتائج.</p>
+                <p class="local-storage-note">يمكن اختيار كل صلاحية بشكل مستقل. عند اختيار دور مدير/ة المدرسة، يمكنك منحه صلاحية إدارة معلمي المدرسة ودعوتهم أو تركها دون تفعيل؛ ولا تسمح هذه الصلاحية بإنشاء مدير آخر. يجب أن تطابق الصفوف المسندة أسماء الصفوف الظاهرة في النتائج؛ وإلا فلن تظهر نتائج.</p>
                 <button type="submit" class="primary-button">إضافة المعلم/ة</button>
             </form>
             <p class="local-storage-note">تعطيل الحساب يوقف صلاحياته دون حذف سجلاته. لا تُعرض كلمات المرور؛ أرسل رابط إعادة التعيين ليختار المستخدم كلمة مرور جديدة.</p>
@@ -132,7 +133,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
     <script src="supabase/config.js"></script>
     <script src="supabase/client.js"></script>
-    <script src="assessment-data.js"></script>
-    <script src="teacher-dashboard-cloud.js"></script>
+    <script src="ملفات الموقع/assessment-data.js"></script>
+    <script src="ملفات الموقع/teacher-dashboard-cloud.js"></script>
 </body>
 </html>

@@ -80,11 +80,12 @@
                     <option value="school_manager">مدير/ة مدرسة</option>
                 </select>
                 <input id="teacher-school" placeholder="المدرسة" required>
-                <input id="teacher-grades" placeholder="أدخل الصفوف كما تظهر في التقارير (مطلوبة للتقارير والتحليلات)">
+                <input id="teacher-grades" placeholder="أدخل الصفوف كما تظهر في التقارير (مطلوبة عند تفعيل التقارير أو التحليلات)" aria-describedby="teacher-grades-help">
+                <small id="teacher-grades-help">تُطلب الصفوف عند اختيار التقارير أو تحليلات المدرسة.</small>
                 <input id="teacher-subjects" placeholder="المواد المسندة (افصل بينها بفاصلة)">
                 <p class="local-storage-note">ستُرسل الدعوة عبر Supabase. لا يُفعّل الحساب قبل قبول الدعوة وإنشاء كلمة المرور. تُقيّد التقارير بالصفوف المسندة، ويستطيع مدير المدرسة إدارة معلمي مدرسته فقط.</p>
                 <div class="permission-grid"><label><input type="checkbox" name="permission" value="reports" checked> عرض التقارير</label><label><input type="checkbox" name="permission" value="analytics" checked> تحليلات المدرسة</label><label><input type="checkbox" name="permission" value="questions"> إدارة وتعديل الأسئلة</label><label><input type="checkbox" name="permission" value="interventions"> تعديل التدخل والشرح</label><label><input type="checkbox" name="permission" value="support"> إدارة الدعم والمساندة</label><label id="manage-teachers-option" class="hidden"><input type="checkbox" name="permission" value="manage_teachers"> إدارة معلمي المدرسة ودعوتهم</label></div>
-                <p class="local-storage-note">يمكن اختيار كل صلاحية بشكل مستقل. صلاحية إدارة المعلمين تظهر لمدير/ة المدرسة فقط، ولا تسمح بإنشاء مدير آخر. يجب أن تطابق الصفوف المسندة أسماء الصفوف الظاهرة في النتائج؛ وإلا فلن تظهر نتائج.</p>
+                <p class="local-storage-note">يمكن اختيار كل صلاحية بشكل مستقل. عند اختيار دور مدير/ة المدرسة، يمكنك منحه صلاحية إدارة معلمي المدرسة ودعوتهم أو تركها دون تفعيل؛ ولا تسمح هذه الصلاحية بإنشاء مدير آخر. يجب أن تطابق الصفوف المسندة أسماء الصفوف الظاهرة في النتائج؛ وإلا فلن تظهر نتائج.</p>
                 <button type="submit" class="primary-button">إضافة المعلم/ة</button>
             </form>
             <p class="local-storage-note">تعطيل الحساب يوقف صلاحياته دون حذف سجلاته. لا تُعرض كلمات المرور؛ أرسل رابط إعادة التعيين ليختار المستخدم كلمة مرور جديدة.</p>
