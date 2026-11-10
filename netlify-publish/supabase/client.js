@@ -23,19 +23,30 @@
 
         async getProfile() {
             const supabase = this.requireClient();
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!sessionData.session) return null;
+
             const { data: userData, error: userError } = await supabase.auth.getUser();
             if (userError) throw userError;
             if (!userData.user) return null;
+            if (userData.user.id !== sessionData.session.user.id) {
+                throw new Error('The authenticated user changed while loading the profile.');
+            }
 
             if (userData.user.email?.trim().toLowerCase() === 'brraa.20@gmail.com') {
                 await check(supabase.rpc('ensure_platform_owner_profile'));
             }
 
-            const profile = await check(supabase
+            const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('id, email, display_name, role, active, invitation_accepted, permissions, school_name, assigned_grades, assigned_subjects')
                 .eq('id', userData.user.id)
-                .maybeSingle());
+                .maybeSingle();
+            if (profileError) throw profileError;
+            if (profile && profile.id !== userData.user.id) {
+                throw new Error('The loaded profile does not match the authenticated user.');
+            }
             return profile ? { ...profile, email: userData.user.email } : null;
         },
 
